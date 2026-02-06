@@ -2,7 +2,10 @@
 
 > **Wallpapers em 4K automático para macOS** — Baixe, upscale e use em segundos.
 
-Wails template for Nextjs v15 with tailwindcss v4.
+![Version](https://img.shields.io/badge/version-0.0.1-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![macOS](https://img.shields.io/badge/macOS-11.0+-lightgrey)
+![Node](https://img.shields.io/badge/Node-18+-green)
 
 ---
 
