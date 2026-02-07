@@ -1,3 +1,32 @@
 build/bin
 node_modules
 frontend/dist
+frontend/node_modules
+frontend/.next
+frontend/out
+
+# AI binaries and models (large files)
+binaries/*/realesrgan-ncnn-vulkan*
+binaries/*/realcugan-ncnn-vulkan*
+binaries/*/models/*.bin
+binaries/*/models/*.param
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Environment variables
+.env
+.env.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# OS
+.DS_Store
