@@ -19,25 +19,25 @@ type APIProvider interface {
 
 // SearchOptions contains search parameters
 type SearchOptions struct {
-	Page     int
-	PerPage  int
-	Category string
-	Orientation string // "horizontal", "vertical", "all"
-	MinWidth int
-	MinHeight int
+	Page        int    `json:"page"`
+	PerPage     int    `json:"perPage"`
+	Category    string `json:"category"`
+	Orientation string `json:"orientation"` // "horizontal", "vertical", "all"
+	MinWidth    int    `json:"minWidth"`
+	MinHeight   int    `json:"minHeight"`
 }
 
 // ImageResult represents a single image result
 type ImageResult struct {
-	ID          string
-	URL         string
-	DownloadURL string
-	PreviewURL  string
-	Width       int
-	Height      int
-	Author      string
-	Source      string
-	Tags        []string
+	ID          string   `json:"id"`
+	URL         string   `json:"url"`
+	DownloadURL string   `json:"downloadURL"`
+	PreviewURL  string   `json:"previewURL"`
+	Width       int      `json:"width"`
+	Height      int      `json:"height"`
+	Author      string   `json:"author"`
+	Source      string   `json:"source"`
+	Tags        []string `json:"tags"`
 }
 
 // PixabayProvider implements APIProvider for Pixabay
