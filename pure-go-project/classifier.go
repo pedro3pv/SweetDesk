@@ -6,9 +6,12 @@ import (
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"log"
 	"math"
+	"net/http"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/image/draw"
 
@@ -19,9 +22,78 @@ type Labels struct {
 	Labels []string `json:"labels"`
 }
 
+// downloadFile downloads a file from a URL to a local path
+func downloadFile(url, filepath string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to download from %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	out, err := os.Create(filepath)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", filepath, err)
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to save file: %w", err)
+	}
+
+	return nil
+}
+
+// ensureModelFiles checks if model files exist and downloads them if not
+func ensureModelFiles(modelDir string) error {
+	modelPath := filepath.Join(modelDir, "model.onnx")
+	metaPath := filepath.Join(modelDir, "meta.json")
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(modelDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Check and download model.onnx
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		log.Println("Downloading model.onnx...")
+		url := "https://huggingface.co/deepghs/anime_real_cls/resolve/main/caformer_s36_v1.3_fixed/model.onnx"
+		if err := downloadFile(url, modelPath); err != nil {
+			return fmt.Errorf("failed to download model.onnx: %w", err)
+		}
+		log.Println("model.onnx downloaded successfully")
+	} else {
+		log.Println("model.onnx already exists, skipping download")
+	}
+
+	// Check and download meta.json
+	if _, err := os.Stat(metaPath); os.IsNotExist(err) {
+		log.Println("Downloading meta.json...")
+		url := "https://huggingface.co/deepghs/anime_real_cls/resolve/main/caformer_s36_v1.3_fixed/meta.json"
+		if err := downloadFile(url, metaPath); err != nil {
+			return fmt.Errorf("failed to download meta.json: %w", err)
+		}
+		log.Println("meta.json downloaded successfully")
+	} else {
+		log.Println("meta.json already exists, skipping download")
+	}
+
+	return nil
+}
+
 func main() {
-	modelPath := "./caformer_s36_v1.3_fixed/model.onnx"
-	metaPath := "./caformer_s36_v1.3_fixed/meta.json"
+	modelDir := "./caformer_s36_v1.3_fixed"
+	modelPath := filepath.Join(modelDir, "model.onnx")
+	metaPath := filepath.Join(modelDir, "meta.json")
+
+	// Ensure model files are downloaded
+	if err := ensureModelFiles(modelDir); err != nil {
+		log.Fatalf("Failed to ensure model files: %v", err)
+	}
 
 	// Inicializa biblioteca ONNX Runtime
 	ort.SetSharedLibraryPath("/opt/homebrew/lib/libonnxruntime.dylib") // macOS
