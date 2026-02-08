@@ -99,15 +99,17 @@ SweetDesk/
 
 ## In-Memory Processing
 
-All image processing happens in memory using byte arrays:
+The primary image processing pipeline operates in memory using byte arrays:
 - Images loaded from API or file → byte[]
-- Processing pipeline operates on byte[] → byte[]
-- Only writes to disk when user clicks "Save"
+- Most processing stages operate on byte[] → byte[]
+- Persistent writes to user-visible files only occur when the user clicks "Save"
 
-This ensures:
+Note: Some internal AI-related operations (e.g., Python scripts and upscaling binaries) may use short-lived temporary files in the OS temp directory as part of their processing.
+
+This design aims to provide:
 - Fast processing
-- No temporary file cleanup needed
-- Privacy (images never touch disk until saved)
+- Minimal disk usage with only transient temporary files
+- Improved privacy (no persistent image files are written until explicitly saved by the user)
 
 ## AI Model Sources
 
