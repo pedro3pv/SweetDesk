@@ -48,7 +48,7 @@ export default function ProcessingPanel({
             setProgress('🎨 Finalizing...');
             // @ts-ignore
             const result = await window.go.main.App.ProcessImage(
-                imageData,
+                upscaled,
                 targetResolution,
                 useSeamCarving
             );
