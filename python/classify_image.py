@@ -21,7 +21,6 @@ def classify_image(image_path):
         img_array = np.array(img.convert('RGB'))
         
         # Calculate image statistics
-        mean_color = np.mean(img_array, axis=(0, 1))
         std_color = np.std(img_array, axis=(0, 1))
         
         # Calculate color saturation
