@@ -78,7 +78,6 @@ func (d *Downloader) EnsureRealCUGANModel() error {
 
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		log.Println("Baixando RealCUGAN-pro...")
-		// URL de exemplo - ajustar para o modelo correto
 		url := "https://huggingface.co/deepghs/imgutils-models/resolve/main/real_esrgan/RealESRGAN_x4plus_anime_6B.onnx"
 		if err := d.DownloadFile(url, modelPath); err != nil {
 			return err
@@ -99,8 +98,7 @@ func (d *Downloader) EnsureLSDIRModel() error {
 
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		log.Println("Baixando 4xLSDIR...")
-		// URL de exemplo - ajustar para o modelo correto
-		url := "https://huggingface.co/Jonny001/deepfake/resolve/main/lsdir_x4.onnx"
+		url := "https://huggingface.co/wanesoft/faceswap_pack/resolve/main/lsdir_x4.onnx"
 		if err := d.DownloadFile(url, modelPath); err != nil {
 			return err
 		}
