@@ -4,6 +4,7 @@ import React from "react"
 
 import { useState, useCallback } from 'react';
 import type { ImageResult, FilterState } from '@/lib/types';
+import { SearchImages } from '@wailsjs/go/main/App';
 
 interface SearchPanelProps {
     onImageSelect: (image: ImageResult) => void;
@@ -40,30 +41,34 @@ export default function SearchPanel({ onImageSelect, onAddToList }: SearchPanelP
 
         setIsSearching(true);
         try {
-            // @ts-ignore - Wails runtime
-            if (typeof window !== 'undefined' && window.go?.main?.App?.SearchImages) {
-                // @ts-ignore
-                const images = await window.go.main.App.SearchImages(query, 1, 18);
-                if (images) {
-                    setResults(images.map((img: Record<string, unknown>) => ({
-                        id: img.ID as string || img.id as string,
-                        url: img.URL as string || img.url as string,
-                        downloadURL: img.DownloadURL as string || img.downloadURL as string,
-                        previewURL: img.PreviewURL as string || img.previewURL as string,
-                        width: img.Width as number || img.width as number,
-                        height: img.Height as number || img.height as number,
-                        author: img.Author as string || img.author as string,
-                        source: img.Source as string || img.source as string,
-                        tags: (img.Tags as string[]) || (img.tags as string[]) || [],
+            // Use Wails backend for search
+            if (typeof SearchImages !== 'undefined') {
+                const images = await SearchImages(query, 1, 18);
+                if (images && images.length > 0) {
+                    setResults(images.map((img) => ({
+                        id: img.id,
+                        url: img.url,
+                        downloadURL: img.downloadURL,
+                        previewURL: img.previewURL,
+                        width: img.width,
+                        height: img.height,
+                        author: img.author,
+                        source: img.source,
+                        tags: img.tags || [],
+                        description: '', // Add if available in backend
                     })));
+                } else {
+                    setResults([]);
                 }
             } else {
-                // Mock search
+                // Fallback to mock data for development
                 await new Promise(r => setTimeout(r, 600));
                 setResults(MOCK_IMAGES);
             }
         } catch (error) {
             console.error('Search failed:', error);
+            // Fallback to mock on error
+            setResults(MOCK_IMAGES);
         } finally {
             setIsSearching(false);
         }

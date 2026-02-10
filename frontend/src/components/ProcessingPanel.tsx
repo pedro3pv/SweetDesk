@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ClassifyImage, UpscaleImage, ProcessImage } from '@wailsjs/go/main/App';
 
 interface ProcessingPanelProps {
     imageData: string;
@@ -28,8 +29,7 @@ export default function ProcessingPanel({
         try {
             // Step 1: Classify
             setProgress('🔍 Classifying image type...');
-            // @ts-ignore
-            const imageType = await window.go.main.App.ClassifyImage(imageData);
+            const imageType = await ClassifyImage(imageData);
             
             setProgress(`📊 Detected: ${imageType === 'anime' ? '🎨 Anime' : '📷 Photo'}`);
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -38,16 +38,14 @@ export default function ProcessingPanel({
             setProgress('🚀 Upscaling to ' + targetResolution + '...');
             const scale = targetResolution === '8K' ? 8 : targetResolution === '5K' ? 5 : 4;
             
-            // @ts-ignore
-            const upscaled = await window.go.main.App.UpscaleImage(imageData, imageType, scale);
+            const upscaled = await UpscaleImage(imageData, imageType, scale);
             
             setProgress('✨ Adjusting aspect ratio...');
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // Step 3: Full processing
             setProgress('🎨 Finalizing...');
-            // @ts-ignore
-            const result = await window.go.main.App.ProcessImage(
+            const result = await ProcessImage(
                 upscaled,
                 targetResolution,
                 useSeamCarving
