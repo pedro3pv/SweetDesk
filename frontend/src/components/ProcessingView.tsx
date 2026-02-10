@@ -28,11 +28,24 @@ export default function ProcessingView({ items, onComplete }: ProcessingViewProp
                 // Try Wails backend first
                 // @ts-ignore
                 if (typeof window !== 'undefined' && window.go?.main?.App?.ProcessImage) {
-                    const base64 = item.image.downloadURL.startsWith('data:')
-                        ? item.image.downloadURL.split(',')[1]
-                        : item.image.downloadURL;
-                    // @ts-ignore
-                    await window.go.main.App.ProcessImage(base64, item.dimension, item.upscale);
+                    let base64Data: string | null = null;
+
+                    if (item.image.downloadURL.startsWith('data:')) {
+                        // Strip the data URL prefix and keep only the base64 payload
+                        base64Data = item.image.downloadURL.split(',')[1] || null;
+                    } else if (window.go.main.App.DownloadImage) {
+                        // @ts-ignore - Download and convert remote image URL to base64 via Wails binding
+                        base64Data = await window.go.main.App.DownloadImage(item.image.downloadURL);
+                    }
+
+                    if (base64Data) {
+                        const useSeamCarving = false;
+                        // @ts-ignore
+                        await window.go.main.App.ProcessImage(base64Data, item.dimension, useSeamCarving);
+                    } else {
+                        // Fallback: simulate processing if we cannot obtain base64 data
+                        await new Promise(r => setTimeout(r, 800 + Math.random() * 1200));
+                    }
                 } else {
                     // Simulate processing
                     await new Promise(r => setTimeout(r, 800 + Math.random() * 1200));
