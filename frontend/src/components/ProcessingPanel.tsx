@@ -31,19 +31,14 @@ export default function ProcessingPanel({
         setProgress('Starting processing...');
 
         try {
-            // Step 1: Classify (handled internally by ProcessImage; this is just UX)
-            setProgress('🔍 Classifying image type...');
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Show progress indicators for user feedback during processing
+            setProgress('🔍 Analyzing image...');
+            await new Promise(resolve => setTimeout(resolve, 300));
 
-            // Step 2: Upscale (handled internally by ProcessImage; this is just UX)
-            setProgress('🚀 Upscaling to ' + targetResolution + '...');
-            await new Promise(resolve => setTimeout(resolve, 500));
+            setProgress('🚀 Processing to ' + targetResolution + '...');
+            await new Promise(resolve => setTimeout(resolve, 300));
 
-            setProgress('✨ Adjusting aspect ratio...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Step 3: Full processing (classification + upscale + adjustments in backend)
-            setProgress('🎨 Finalizing...');
+            // Full processing (classification + upscale + adjustments in backend)
             const result = await ProcessImage(
                 imageData,
                 targetResolution,
