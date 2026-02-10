@@ -194,56 +194,26 @@ func (sc *SeamCarver) ResizeToExactDimensions(opts ResizeOptions) (image.Image, 
 		return sc.img, nil
 	}
 
-	// Primeiro ajusta a largura, se necessário
-	result := sc.img
-	if width != opts.TargetWidth {
-		widthDiff := width - opts.TargetWidth
-		if widthDiff > 0 {
-			// Reduzir largura
-			maxDelta := opts.MaxDeltaBySeams
-			if maxDelta == 0 {
-				maxDelta = 300 // padrão
+	// Direct resize to exact dimensions without maintaining aspect ratio
+	result := image.NewRGBA(image.Rect(0, 0, opts.TargetWidth, opts.TargetHeight))
+	
+	// Simple bilinear scaling
+	for y := 0; y < opts.TargetHeight; y++ {
+		sourceY := int(float64(y) * float64(height) / float64(opts.TargetHeight))
+		if sourceY >= height {
+			sourceY = height - 1
+		}
+		for x := 0; x < opts.TargetWidth; x++ {
+			sourceX := int(float64(x) * float64(width) / float64(opts.TargetWidth))
+			if sourceX >= width {
+				sourceX = width - 1
 			}
-			if widthDiff > maxDelta {
-				widthDiff = maxDelta
-			}
-
-			log.Printf("🔧 Reduzindo largura em %d pixels", widthDiff)
-			result = resizeWidth(result, width-widthDiff)
-		} else {
-			// Aumentar largura (scaling)
-			log.Printf("🔧 Aumentando largura para %d pixels", opts.TargetWidth)
-			result = scaleToWidth(result, opts.TargetWidth)
+			r, g, b, a := getPixel(sc.img, sourceX, sourceY)
+			result.SetRGBA(x, y, color.RGBA{R: r, G: g, B: b, A: a})
 		}
 	}
 
-	// Depois ajusta a altura, se necessário
-	resultBounds := result.Bounds()
-	currentHeight := resultBounds.Dy()
-
-	if currentHeight != opts.TargetHeight {
-		heightDiff := currentHeight - opts.TargetHeight
-		if heightDiff > 0 {
-			// Reduzir altura
-			maxDelta := opts.MaxDeltaBySeams
-			if maxDelta == 0 {
-				maxDelta = 300
-			}
-			if heightDiff > maxDelta {
-				heightDiff = maxDelta
-			}
-
-			log.Printf("🔧 Reduzindo altura em %d pixels", heightDiff)
-			result = resizeHeight(result, currentHeight-heightDiff)
-		} else {
-			// Aumentar altura (scaling)
-			log.Printf("🔧 Aumentando altura para %d pixels", opts.TargetHeight)
-			result = scaleToHeight(result, opts.TargetHeight)
-		}
-	}
-
-	resultBounds = result.Bounds()
-	log.Printf("✅ Final: %dx%d", resultBounds.Dx(), resultBounds.Dy())
+	log.Printf("✅ Final: %dx%d", opts.TargetWidth, opts.TargetHeight)
 
 	return result, nil
 }
