@@ -13,8 +13,10 @@ import (
 	"os"
 	"path/filepath"
 
-	ort "github.com/yalue/onnxruntime_go"
+	"github.com/owulveryck/onnx-go"
+	"github.com/owulveryck/onnx-go/backend/x/gorgonnx"
 	"golang.org/x/image/draw"
+	"gorgonia.org/tensor"
 )
 
 type UpscalerType string
@@ -24,43 +26,26 @@ const (
 	LSDIR     UpscalerType = "lsdir"
 )
 
-// UpscaleOptions define opções de processamento
 type UpscaleOptions struct {
-	// ScaleFactor: fator de escala (ex: 2.0, 3.0, 4.0)
-	// Se 0, usa o scale padrão do modelo
-	ScaleFactor float64
-
-	// TargetWidth/TargetHeight: resolução alvo específica
-	// Se definidos, ScaleFactor é ignorado
-	TargetWidth  int
-	TargetHeight int
-
-	// MaxResolution: limite máximo (largura ou altura)
-	// Se a saída exceder, será redimensionada proporcionalmente
-	MaxResolution int
-
-	// KeepAspectRatio: mantém proporção ao usar TargetWidth/Height
+	ScaleFactor     float64
+	TargetWidth     int
+	TargetHeight    int
+	MaxResolution   int
 	KeepAspectRatio bool
-
-	// Format: formato de saída ("png", "jpg")
-	Format string
+	Format          string
 }
 
 type Upscaler struct {
-	ctx          context.Context
-	modelType    UpscalerType
-	modelPath    string
-	session      *ort.Session[float32]
-	inputTensor  *ort.Tensor[float32]
-	outputTensor *ort.Tensor[float32]
-	inputName    string
-	outputName   string
-	tileSize     int
-	modelScale   int // Scale nativo do modelo
+	ctx        context.Context
+	modelType  UpscalerType
+	backend    *gorgonnx.Graph
+	model      *onnx.Model
+	tileSize   int
+	modelScale int
 }
 
-// NewUpscaler cria um novo upscaler com modelo embutido
-func NewUpscaler(ctx context.Context, modelType UpscalerType, modelsFS embed.FS, onnxLibPath string) (*Upscaler, error) {
+// NewUpscaler cria upscaler com onnx-go (pure Go, sem DLL)
+func NewUpscaler(ctx context.Context, modelType UpscalerType, modelsFS embed.FS) (*Upscaler, error) {
 	u := &Upscaler{
 		ctx:        ctx,
 		modelType:  modelType,
@@ -78,58 +63,29 @@ func NewUpscaler(ctx context.Context, modelType UpscalerType, modelsFS embed.FS,
 		return nil, fmt.Errorf("tipo de upscaler desconhecido: %s", modelType)
 	}
 
-	// Lê modelo da memória (embed.FS)
+	// Lê modelo do embed
 	modelData, err := modelsFS.ReadFile(modelPath)
 	if err != nil {
-		return nil, fmt.Errorf("modelo não encontrado no embed: %w", err)
+		return nil, fmt.Errorf("modelo não encontrado: %w", err)
 	}
 
-	ort.SetSharedLibraryPath(onnxLibPath)
+	// Inicializa backend Gorgonia
+	u.backend = gorgonnx.NewGraph()
+	u.model = onnx.NewModel(u.backend)
 
-	// Valores hardcoded (ajuste conforme seus modelos)
-	u.inputName = "input"
-	u.outputName = "output"
-
-	// Cria tensores
-	inputShape := ort.NewShape(1, 3, int64(u.tileSize), int64(u.tileSize))
-	inputData := make([]float32, 1*3*u.tileSize*u.tileSize)
-	u.inputTensor, err = ort.NewTensor(inputShape, inputData)
-	if err != nil {
-		return nil, fmt.Errorf("falha ao criar input tensor: %w", err)
+	// Carrega modelo ONNX
+	if err := u.model.UnmarshalBinary(modelData); err != nil {
+		return nil, fmt.Errorf("falha ao carregar modelo: %w", err)
 	}
 
-	outputSize := u.tileSize * u.modelScale
-	outputShape := ort.NewShape(1, 3, int64(outputSize), int64(outputSize))
-	u.outputTensor, err = ort.NewEmptyTensor[float32](outputShape)
-	if err != nil {
-		u.inputTensor.Destroy()
-		return nil, fmt.Errorf("falha ao criar output tensor: %w", err)
-	}
-
-	// Cria sessão ONNX a partir dos bytes
-	u.session, err = ort.NewSessionWithONNXData[float32](
-		modelData,
-		[]string{u.inputName},
-		[]string{u.outputName},
-		[]*ort.Tensor[float32]{u.inputTensor},
-		[]*ort.Tensor[float32]{u.outputTensor},
-	)
-
-	if err != nil {
-		u.inputTensor.Destroy()
-		u.outputTensor.Destroy()
-		return nil, fmt.Errorf("falha ao criar sessão: %w", err)
-	}
-
+	log.Printf("✅ Modelo %s carregado (pure Go, sem DLL)", modelType)
 	return u, nil
 }
 
-// Upscale com opções padrão (4x)
 func (u *Upscaler) Upscale(inputPath, outputPath string) error {
 	return u.UpscaleWithOptions(inputPath, outputPath, nil)
 }
 
-// UpscaleWithOptions permite controle total da resolução (arquivo -> arquivo)
 func (u *Upscaler) UpscaleWithOptions(inputPath, outputPath string, opts *UpscaleOptions) error {
 	imgFile, err := os.Open(inputPath)
 	if err != nil {
@@ -150,21 +106,17 @@ func (u *Upscaler) UpscaleWithOptions(inputPath, outputPath string, opts *Upscal
 	return u.saveImage(result, outputPath)
 }
 
-// UpscaleBytes processa imagem a partir de bytes e retorna bytes
 func (u *Upscaler) UpscaleBytes(imageData []byte, opts *UpscaleOptions) ([]byte, error) {
-	// Decodifica imagem
 	imgData, _, err := image.Decode(bytes.NewReader(imageData))
 	if err != nil {
 		return nil, fmt.Errorf("falha ao decodificar imagem: %w", err)
 	}
 
-	// Processa
 	result, err := u.upscaleImage(imgData, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	// Codifica resultado
 	var buf bytes.Buffer
 	format := "png"
 	if opts != nil && opts.Format != "" {
@@ -185,9 +137,7 @@ func (u *Upscaler) UpscaleBytes(imageData []byte, opts *UpscaleOptions) ([]byte,
 	return buf.Bytes(), nil
 }
 
-// upscaleImage - lógica interna de processamento
 func (u *Upscaler) upscaleImage(imgData image.Image, opts *UpscaleOptions) (image.Image, error) {
-	// Verifica contexto
 	select {
 	case <-u.ctx.Done():
 		return nil, u.ctx.Err()
@@ -197,28 +147,24 @@ func (u *Upscaler) upscaleImage(imgData image.Image, opts *UpscaleOptions) (imag
 	bounds := imgData.Bounds()
 	width, height := bounds.Dx(), bounds.Dy()
 
-	// Calcula resolução de saída
 	targetWidth, targetHeight := u.calculateOutputSize(width, height, opts)
 	log.Printf("📐 Entrada: %dx%d", width, height)
 	log.Printf("🎯 Saída alvo: %dx%d", targetWidth, targetHeight)
 
-	// Upscale com o modelo
 	var upscaled image.Image
 	var err error
 
 	if width <= u.tileSize && height <= u.tileSize {
 		upscaled, err = u.processTile(imgData)
-		if err != nil {
-			return nil, err
-		}
 	} else {
 		upscaled, err = u.processTiled(imgData)
-		if err != nil {
-			return nil, err
-		}
 	}
 
-	// Ajusta para resolução final se necessário
+	if err != nil {
+		return nil, err
+	}
+
+	// Ajusta resolução final se necessário
 	upscaledBounds := upscaled.Bounds()
 	if upscaledBounds.Dx() != targetWidth || upscaledBounds.Dy() != targetHeight {
 		log.Printf("🔧 Ajustando resolução final...")
@@ -230,7 +176,122 @@ func (u *Upscaler) upscaleImage(imgData image.Image, opts *UpscaleOptions) (imag
 	return upscaled, nil
 }
 
-// calculateOutputSize determina a resolução de saída
+func (u *Upscaler) processTile(img image.Image) (image.Image, error) {
+	select {
+	case <-u.ctx.Done():
+		return nil, u.ctx.Err()
+	default:
+	}
+
+	bounds := img.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+
+	// Redimensiona para tileSize
+	resized := image.NewRGBA(image.Rect(0, 0, u.tileSize, u.tileSize))
+	draw.BiLinear.Scale(resized, resized.Bounds(), img, bounds, draw.Over, nil)
+
+	// Converte para tensor Gorgonia [1, 3, H, W]
+	inputData := make([]float32, 1*3*u.tileSize*u.tileSize)
+	for y := 0; y < u.tileSize; y++ {
+		for x := 0; x < u.tileSize; x++ {
+			r, g, b, _ := resized.At(x, y).RGBA()
+			inputData[0*u.tileSize*u.tileSize+y*u.tileSize+x] = float32(r>>8) / 255.0
+			inputData[1*u.tileSize*u.tileSize+y*u.tileSize+x] = float32(g>>8) / 255.0
+			inputData[2*u.tileSize*u.tileSize+y*u.tileSize+x] = float32(b>>8) / 255.0
+		}
+	}
+
+	inputTensor := tensor.New(
+		tensor.WithShape(1, 3, u.tileSize, u.tileSize),
+		tensor.WithBacking(inputData),
+	)
+
+	// Set input no modelo
+	if err := u.model.SetInput(0, inputTensor); err != nil {
+		return nil, fmt.Errorf("falha ao setar input: %w", err)
+	}
+
+	// Executa inferência
+	if err := u.backend.Run(); err != nil {
+		return nil, fmt.Errorf("falha na inferência: %w", err)
+	}
+
+	// Obtém output
+	outputs, err := u.model.GetOutputTensors()
+	if err != nil {
+		return nil, fmt.Errorf("falha ao obter output: %w", err)
+	}
+
+	outputTensor := outputs[0]
+	outputData := outputTensor.Data().([]float32)
+
+	// Converte tensor para imagem
+	outputSize := u.tileSize * u.modelScale
+	result := image.NewRGBA(image.Rect(0, 0, outputSize, outputSize))
+
+	for y := 0; y < outputSize; y++ {
+		for x := 0; x < outputSize; x++ {
+			r := uint8(clamp(outputData[0*outputSize*outputSize+y*outputSize+x]*255.0, 0, 255))
+			g := uint8(clamp(outputData[1*outputSize*outputSize+y*outputSize+x]*255.0, 0, 255))
+			b := uint8(clamp(outputData[2*outputSize*outputSize+y*outputSize+x]*255.0, 0, 255))
+			result.SetRGBA(x, y, color.RGBA{R: r, G: g, B: b, A: 255})
+		}
+	}
+
+	// Ajusta se entrada era menor
+	if width < u.tileSize || height < u.tileSize {
+		finalWidth := width * u.modelScale
+		finalHeight := height * u.modelScale
+		final := image.NewRGBA(image.Rect(0, 0, finalWidth, finalHeight))
+		draw.BiLinear.Scale(final, final.Bounds(), result, result.Bounds(), draw.Over, nil)
+		return final, nil
+	}
+
+	return result, nil
+}
+
+func (u *Upscaler) processTiled(img image.Image) (image.Image, error) {
+	bounds := img.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+	outputWidth := width * u.modelScale
+	outputHeight := height * u.modelScale
+	result := image.NewRGBA(image.Rect(0, 0, outputWidth, outputHeight))
+
+	totalTiles := ((width + u.tileSize - 1) / u.tileSize) * ((height + u.tileSize - 1) / u.tileSize)
+	currentTile := 0
+
+	for y := 0; y < height; y += u.tileSize {
+		for x := 0; x < width; x += u.tileSize {
+			select {
+			case <-u.ctx.Done():
+				return nil, u.ctx.Err()
+			default:
+			}
+
+			currentTile++
+			tileWidth := min(u.tileSize, width-x)
+			tileHeight := min(u.tileSize, height-y)
+			log.Printf("  Tile %d/%d", currentTile, totalTiles)
+
+			tile := image.NewRGBA(image.Rect(0, 0, tileWidth, tileHeight))
+			draw.Draw(tile, tile.Bounds(), img, image.Point{X: x, Y: y}, draw.Src)
+
+			processedTile, err := u.processTile(tile)
+			if err != nil {
+				return nil, fmt.Errorf("falha ao processar tile: %w", err)
+			}
+
+			draw.Draw(result,
+				image.Rect(x*u.modelScale, y*u.modelScale, (x+tileWidth)*u.modelScale, (y+tileHeight)*u.modelScale),
+				processedTile,
+				image.Point{X: 0, Y: 0},
+				draw.Src)
+		}
+	}
+
+	return result, nil
+}
+
 func (u *Upscaler) calculateOutputSize(inputWidth, inputHeight int, opts *UpscaleOptions) (int, int) {
 	if opts == nil {
 		opts = &UpscaleOptions{ScaleFactor: float64(u.modelScale)}
@@ -238,7 +299,6 @@ func (u *Upscaler) calculateOutputSize(inputWidth, inputHeight int, opts *Upscal
 
 	var targetWidth, targetHeight int
 
-	// Prioridade 1: Resolução específica
 	if opts.TargetWidth > 0 || opts.TargetHeight > 0 {
 		if opts.KeepAspectRatio {
 			if opts.TargetWidth > 0 && opts.TargetHeight > 0 {
@@ -267,16 +327,13 @@ func (u *Upscaler) calculateOutputSize(inputWidth, inputHeight int, opts *Upscal
 			}
 		}
 	} else if opts.ScaleFactor > 0 {
-		// Prioridade 2: Fator de escala
 		targetWidth = int(float64(inputWidth) * opts.ScaleFactor)
 		targetHeight = int(float64(inputHeight) * opts.ScaleFactor)
 	} else {
-		// Padrão: usa scale do modelo
 		targetWidth = inputWidth * u.modelScale
 		targetHeight = inputHeight * u.modelScale
 	}
 
-	// Aplica limite máximo se definido
 	if opts.MaxResolution > 0 {
 		if targetWidth > opts.MaxResolution || targetHeight > opts.MaxResolution {
 			if targetWidth > targetHeight {
@@ -295,111 +352,6 @@ func (u *Upscaler) calculateOutputSize(inputWidth, inputHeight int, opts *Upscal
 	return targetWidth, targetHeight
 }
 
-func (u *Upscaler) processTile(img image.Image) (image.Image, error) {
-	// Verifica contexto
-	select {
-	case <-u.ctx.Done():
-		return nil, u.ctx.Err()
-	default:
-	}
-
-	bounds := img.Bounds()
-	width, height := bounds.Dx(), bounds.Dy()
-
-	// Redimensiona para tileSize
-	resized := image.NewRGBA(image.Rect(0, 0, u.tileSize, u.tileSize))
-	draw.BiLinear.Scale(resized, resized.Bounds(), img, bounds, draw.Over, nil)
-
-	// Converte para tensor
-	data := u.inputTensor.GetData()
-	for y := 0; y < u.tileSize; y++ {
-		for x := 0; x < u.tileSize; x++ {
-			r, g, b, _ := resized.At(x, y).RGBA()
-			data[0*u.tileSize*u.tileSize+y*u.tileSize+x] = float32(r>>8) / 255.0
-			data[1*u.tileSize*u.tileSize+y*u.tileSize+x] = float32(g>>8) / 255.0
-			data[2*u.tileSize*u.tileSize+y*u.tileSize+x] = float32(b>>8) / 255.0
-		}
-	}
-
-	// Inferência
-	if err := u.session.Run(); err != nil {
-		return nil, fmt.Errorf("falha na inferência: %w", err)
-	}
-
-	// Converte resultado
-	outputData := u.outputTensor.GetData()
-	outputSize := u.tileSize * u.modelScale
-	result := image.NewRGBA(image.Rect(0, 0, outputSize, outputSize))
-
-	for y := 0; y < outputSize; y++ {
-		for x := 0; x < outputSize; x++ {
-			r := uint8(clamp(outputData[0*outputSize*outputSize+y*outputSize+x]*255.0, 0, 255))
-			g := uint8(clamp(outputData[1*outputSize*outputSize+y*outputSize+x]*255.0, 0, 255))
-			b := uint8(clamp(outputData[2*outputSize*outputSize+y*outputSize+x]*255.0, 0, 255))
-			result.SetRGBA(x, y, color.RGBA{R: r, G: g, B: b, A: 255})
-		}
-	}
-
-	// Ajusta se entrada era menor que tileSize
-	if width < u.tileSize || height < u.tileSize {
-		finalWidth := width * u.modelScale
-		finalHeight := height * u.modelScale
-		final := image.NewRGBA(image.Rect(0, 0, finalWidth, finalHeight))
-		draw.BiLinear.Scale(final, final.Bounds(), result, result.Bounds(), draw.Over, nil)
-		return final, nil
-	}
-
-	return result, nil
-}
-
-func (u *Upscaler) processTiled(img image.Image) (image.Image, error) {
-	bounds := img.Bounds()
-	width, height := bounds.Dx(), bounds.Dy()
-
-	outputWidth := width * u.modelScale
-	outputHeight := height * u.modelScale
-	result := image.NewRGBA(image.Rect(0, 0, outputWidth, outputHeight))
-
-	totalTiles := ((width + u.tileSize - 1) / u.tileSize) * ((height + u.tileSize - 1) / u.tileSize)
-	currentTile := 0
-
-	for y := 0; y < height; y += u.tileSize {
-		for x := 0; x < width; x += u.tileSize {
-			// Verifica cancelamento
-			select {
-			case <-u.ctx.Done():
-				return nil, u.ctx.Err()
-			default:
-			}
-
-			currentTile++
-			tileWidth := min(u.tileSize, width-x)
-			tileHeight := min(u.tileSize, height-y)
-
-			log.Printf("  Tile %d/%d", currentTile, totalTiles)
-
-			// Extrai tile
-			tile := image.NewRGBA(image.Rect(0, 0, tileWidth, tileHeight))
-			draw.Draw(tile, tile.Bounds(), img, image.Point{X: x, Y: y}, draw.Src)
-
-			// Processa tile
-			processedTile, err := u.processTile(tile)
-			if err != nil {
-				return nil, fmt.Errorf("falha ao processar tile: %w", err)
-			}
-
-			// Cola no resultado
-			draw.Draw(result,
-				image.Rect(x*u.modelScale, y*u.modelScale, (x+tileWidth)*u.modelScale, (y+tileHeight)*u.modelScale),
-				processedTile,
-				image.Point{X: 0, Y: 0},
-				draw.Src)
-		}
-	}
-
-	return result, nil
-}
-
 func (u *Upscaler) saveImage(img image.Image, path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -408,12 +360,12 @@ func (u *Upscaler) saveImage(img image.Image, path string) error {
 
 	outFile, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("falha ao criar arquivo de saída: %w", err)
+		return fmt.Errorf("falha ao criar arquivo: %w", err)
 	}
 	defer outFile.Close()
 
 	if err := png.Encode(outFile, img); err != nil {
-		return fmt.Errorf("falha ao codificar imagem: %w", err)
+		return fmt.Errorf("falha ao codificar: %w", err)
 	}
 
 	bounds := img.Bounds()
@@ -421,7 +373,6 @@ func (u *Upscaler) saveImage(img image.Image, path string) error {
 	return nil
 }
 
-// GetRecommendedModel retorna o modelo recomendado baseado no tipo de imagem
 func GetRecommendedModel(imageType string) UpscalerType {
 	switch imageType {
 	case "anime":
@@ -433,20 +384,11 @@ func GetRecommendedModel(imageType string) UpscalerType {
 	}
 }
 
-// Close libera recursos
 func (u *Upscaler) Close() {
-	if u.session != nil {
-		u.session.Destroy()
-	}
-	if u.inputTensor != nil {
-		u.inputTensor.Destroy()
-	}
-	if u.outputTensor != nil {
-		u.outputTensor.Destroy()
-	}
+	// Gorgonia não precisa de cleanup explícito
+	log.Println("✅ Upscaler fechado")
 }
 
-// Helper functions
 func clamp(v, min, max float32) float32 {
 	if v < min {
 		return min
