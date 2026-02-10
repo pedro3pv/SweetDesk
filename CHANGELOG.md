@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Future Roadmap
 
-### v0.1.0 (Next)
+### v0.0.1 (Next)
 - [ ] Download actual AI binaries (Real-ESRGAN, RealCUGAN)
 - [ ] Implement "Set as Wallpaper" functionality
 - [ ] Add batch processing support
