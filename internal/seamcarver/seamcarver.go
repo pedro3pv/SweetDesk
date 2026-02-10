@@ -23,6 +23,18 @@ type AspectRatioOptions struct {
 	MaxDeltaBySeams int
 }
 
+// ResizeOptions define opções de redimensionamento exato
+type ResizeOptions struct {
+	// TargetWidth: largura exata desejada
+	TargetWidth int
+
+	// TargetHeight: altura exata desejada
+	TargetHeight int
+
+	// MaxDeltaBySeams: máximo de pixels alterados por seams (limite de segurança)
+	MaxDeltaBySeams int
+}
+
 // SeamCarver manipula aspect ratio com content-aware
 type SeamCarver struct {
 	img image.Image
@@ -166,6 +178,173 @@ func (sc *SeamCarver) reduceHorizontal(width, height int, opts AspectRatioOption
 	}
 
 	return result, nil
+}
+
+// ResizeToExactDimensions redimensiona a imagem para dimensões exatas
+func (sc *SeamCarver) ResizeToExactDimensions(opts ResizeOptions) (image.Image, error) {
+	bounds := sc.img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	log.Printf("📐 Original: %dx%d", width, height)
+	log.Printf("🎯 Target: %dx%d", opts.TargetWidth, opts.TargetHeight)
+
+	if width == opts.TargetWidth && height == opts.TargetHeight {
+		log.Printf("ℹ️  Dimensões já estão corretas")
+		return sc.img, nil
+	}
+
+	// Primeiro ajusta a largura, se necessário
+	result := sc.img
+	if width != opts.TargetWidth {
+		widthDiff := width - opts.TargetWidth
+		if widthDiff > 0 {
+			// Reduzir largura
+			maxDelta := opts.MaxDeltaBySeams
+			if maxDelta == 0 {
+				maxDelta = 300 // padrão
+			}
+			if widthDiff > maxDelta {
+				widthDiff = maxDelta
+			}
+
+			log.Printf("🔧 Reduzindo largura em %d pixels", widthDiff)
+			result = resizeWidth(result, width-widthDiff)
+		} else {
+			// Aumentar largura (scaling)
+			log.Printf("🔧 Aumentando largura para %d pixels", opts.TargetWidth)
+			result = scaleToWidth(result, opts.TargetWidth)
+		}
+	}
+
+	// Depois ajusta a altura, se necessário
+	resultBounds := result.Bounds()
+	currentWidth := resultBounds.Dx()
+	currentHeight := resultBounds.Dy()
+
+	if currentHeight != opts.TargetHeight {
+		heightDiff := currentHeight - opts.TargetHeight
+		if heightDiff > 0 {
+			// Reduzir altura
+			maxDelta := opts.MaxDeltaBySeams
+			if maxDelta == 0 {
+				maxDelta = 300
+			}
+			if heightDiff > maxDelta {
+				heightDiff = maxDelta
+			}
+
+			log.Printf("🔧 Reduzindo altura em %d pixels", heightDiff)
+			result = resizeHeight(result, currentHeight-heightDiff)
+		} else {
+			// Aumentar altura (scaling)
+			log.Printf("🔧 Aumentando altura para %d pixels", opts.TargetHeight)
+			result = scaleToHeight(result, opts.TargetHeight)
+		}
+	}
+
+	resultBounds = result.Bounds()
+	log.Printf("✅ Final: %dx%d", resultBounds.Dx(), resultBounds.Dy())
+
+	return result, nil
+}
+
+// resizeWidth redimensiona a largura da imagem
+func resizeWidth(img image.Image, targetWidth int) image.Image {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	result := image.NewRGBA(image.Rect(0, 0, targetWidth, height))
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < targetWidth; x++ {
+			sourceX := int(float64(x) * float64(width) / float64(targetWidth))
+			if sourceX >= width {
+				sourceX = width - 1
+			}
+			r, g, b, a := getPixel(img, sourceX, y)
+			result.SetRGBA(x, y, color.RGBA{R: r, G: g, B: b, A: a})
+		}
+	}
+
+	return result
+}
+
+// resizeHeight redimensiona a altura da imagem
+func resizeHeight(img image.Image, targetHeight int) image.Image {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	result := image.NewRGBA(image.Rect(0, 0, width, targetHeight))
+
+	for y := 0; y < targetHeight; y++ {
+		sourceY := int(float64(y) * float64(height) / float64(targetHeight))
+		if sourceY >= height {
+			sourceY = height - 1
+		}
+		for x := 0; x < width; x++ {
+			r, g, b, a := getPixel(img, x, sourceY)
+			result.SetRGBA(x, y, color.RGBA{R: r, G: g, B: b, A: a})
+		}
+	}
+
+	return result
+}
+
+// scaleToWidth escala a imagem para uma largura específica mantendo aspect ratio
+func scaleToWidth(img image.Image, targetWidth int) image.Image {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	targetHeight := int(float64(height) * float64(targetWidth) / float64(width))
+
+	result := image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
+
+	for y := 0; y < targetHeight; y++ {
+		sourceY := int(float64(y) * float64(height) / float64(targetHeight))
+		if sourceY >= height {
+			sourceY = height - 1
+		}
+		for x := 0; x < targetWidth; x++ {
+			sourceX := int(float64(x) * float64(width) / float64(targetWidth))
+			if sourceX >= width {
+				sourceX = width - 1
+			}
+			r, g, b, a := getPixel(img, sourceX, sourceY)
+			result.SetRGBA(x, y, color.RGBA{R: r, G: g, B: b, A: a})
+		}
+	}
+
+	return result
+}
+
+// scaleToHeight escala a imagem para uma altura específica mantendo aspect ratio
+func scaleToHeight(img image.Image, targetHeight int) image.Image {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	targetWidth := int(float64(width) * float64(targetHeight) / float64(height))
+
+	result := image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
+
+	for y := 0; y < targetHeight; y++ {
+		sourceY := int(float64(y) * float64(height) / float64(targetHeight))
+		if sourceY >= height {
+			sourceY = height - 1
+		}
+		for x := 0; x < targetWidth; x++ {
+			sourceX := int(float64(x) * float64(width) / float64(targetWidth))
+			if sourceX >= width {
+				sourceX = width - 1
+			}
+			r, g, b, a := getPixel(img, sourceX, sourceY)
+			result.SetRGBA(x, y, color.RGBA{R: r, G: g, B: b, A: a})
+		}
+	}
+
+	return result
 }
 
 // SaveImage salva a imagem ajustada (EXPORTADO)
