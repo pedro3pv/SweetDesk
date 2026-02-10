@@ -5,12 +5,10 @@ import type { DownloadItem } from '@/lib/types';
 
 interface ProcessingViewProps {
     items: DownloadItem[];
-    savePath: string;
     onComplete: () => void;
-    onCancel: () => void;
 }
 
-export default function ProcessingView({ items, savePath, onComplete, onCancel }: ProcessingViewProps) {
+export default function ProcessingView({ items, onComplete }: ProcessingViewProps) {
     const [progress, setProgress] = useState(0);
     const [currentItem, setCurrentItem] = useState(0);
     const [status, setStatus] = useState<'processing' | 'complete' | 'error'>('processing');
