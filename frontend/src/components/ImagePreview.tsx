@@ -16,12 +16,15 @@ export default function ImagePreview({ originalImage, processedImage }: ImagePre
 
     // Sync activeView when images change
     useEffect(() => {
-        if (activeView === 'original' && !originalImage && processedImage) {
+        // If showing original but original is gone, switch to processed
+        if (!originalImage && processedImage) {
             setActiveView('processed');
-        } else if (activeView === 'processed' && !processedImage && originalImage) {
+        }
+        // If showing processed but processed is gone, switch to original  
+        else if (!processedImage && originalImage) {
             setActiveView('original');
         }
-    }, [originalImage, processedImage, activeView]);
+    }, [originalImage, processedImage]);
 
     const saveImage = async () => {
         if (!processedImage) return;
@@ -141,13 +144,13 @@ export default function ImagePreview({ originalImage, processedImage }: ImagePre
                             type="button"
                             disabled
                             aria-disabled="true"
-                            title="Set as wallpaper feature coming soon"
+                            aria-label="Set as wallpaper feature coming soon"
                         >
                             🖼️ Set as Wallpaper
                         </button>
                     </div>
                     <p className="mt-2 text-xs lg:text-sm text-purple-500 dark:text-purple-400 text-center">
-                        Set as wallpaper feature coming soon.
+                        Set as wallpaper feature coming soon
                     </p>
                 </div>
             )}
