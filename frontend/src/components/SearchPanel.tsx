@@ -88,6 +88,14 @@ export default function SearchPanel({ onImageSelect, onAddToList }: SearchPanelP
             if (filters.aspect === '1:1' && Math.abs(ratio - 1) > 0.2) return false;
             if (filters.aspect === '21:9' && Math.abs(ratio - 21 / 9) > 0.2) return false;
         }
+        if (filters.dimensions) {
+            const [wStr, hStr] = filters.dimensions.split('x');
+            const width = Number(wStr);
+            const height = Number(hStr);
+            if (!Number.isNaN(width) && !Number.isNaN(height)) {
+                if (img.width !== width || img.height !== height) return false;
+            }
+        }
         return true;
     });
 
