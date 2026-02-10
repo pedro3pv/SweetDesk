@@ -1,10 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 interface ImagePreviewProps {
     originalImage: string | null;
     processedImage: string | null;
+}
+
+// Helper function to normalize image data (handle both base64 and data URLs)
+function normalizeImageData(imageData: string | null): string | null {
+    if (!imageData) return null;
+    return imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
 }
 
 export default function ImagePreview({ originalImage, processedImage }: ImagePreviewProps) {
@@ -30,10 +36,9 @@ export default function ImagePreview({ originalImage, processedImage }: ImagePre
         if (!processedImage) return;
 
         try {
-            // Normalize image data - handle both base64 and data URLs
-            const imageData = processedImage.startsWith('data:') 
-                ? processedImage 
-                : `data:image/png;base64,${processedImage}`;
+            // Normalize image data using helper function
+            const imageData = normalizeImageData(processedImage);
+            if (!imageData) return;
             
             // Create a blob from the data URL
             const response = await fetch(imageData);
@@ -52,6 +57,14 @@ export default function ImagePreview({ originalImage, processedImage }: ImagePre
             console.error('Failed to save image:', error);
         }
     };
+
+    // Compute the image source to display
+    const displayImageSrc = useMemo(() => {
+        const imageToShow = activeView === 'processed' && processedImage 
+            ? processedImage 
+            : originalImage;
+        return normalizeImageData(imageToShow);
+    }, [activeView, processedImage, originalImage]);
 
     return (
         <div className="bg-white/90 dark:bg-dark-surface/90 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200/50 dark:border-dark-border p-4 lg:p-6 h-full">
@@ -91,28 +104,13 @@ export default function ImagePreview({ originalImage, processedImage }: ImagePre
             <div className="relative bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 rounded-lg overflow-hidden border border-purple-200/50 dark:border-purple-800/30" style={{ minHeight: '400px' }}>
                 {(originalImage || processedImage) ? (
                     <div className="flex items-center justify-center p-4">
-                        {(() => {
-                            // Determine which image to show
-                            const imageToShow = activeView === 'processed' && processedImage 
-                                ? processedImage 
-                                : originalImage;
-                            
-                            // If no image available, don't render
-                            if (!imageToShow) return null;
-                            
-                            // Normalize image data - handle both base64 and data URLs
-                            const imageSrc = imageToShow.startsWith('data:') 
-                                ? imageToShow 
-                                : `data:image/png;base64,${imageToShow}`;
-                            
-                            return (
-                                <img
-                                    src={imageSrc}
-                                    alt="Preview"
-                                    className="max-w-full max-h-[500px] lg:max-h-[600px] object-contain rounded-lg shadow-xl"
-                                />
-                            );
-                        })()}
+                        {displayImageSrc && (
+                            <img
+                                src={displayImageSrc}
+                                alt="Preview"
+                                className="max-w-full max-h-[500px] lg:max-h-[600px] object-contain rounded-lg shadow-xl"
+                            />
+                        )}
                     </div>
                 ) : (
                     <div className="flex items-center justify-center h-[400px]">
