@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface ImagePreviewProps {
     originalImage: string | null;
@@ -8,14 +8,32 @@ interface ImagePreviewProps {
 }
 
 export default function ImagePreview({ originalImage, processedImage }: ImagePreviewProps) {
-    const [activeView, setActiveView] = useState<'original' | 'processed'>('original');
+    // Initialize activeView based on which image is available
+    const [activeView, setActiveView] = useState<'original' | 'processed'>(() => {
+        if (processedImage && !originalImage) return 'processed';
+        return 'original';
+    });
+
+    // Sync activeView when images change
+    useEffect(() => {
+        if (activeView === 'original' && !originalImage && processedImage) {
+            setActiveView('processed');
+        } else if (activeView === 'processed' && !processedImage && originalImage) {
+            setActiveView('original');
+        }
+    }, [originalImage, processedImage, activeView]);
 
     const saveImage = async () => {
         if (!processedImage) return;
 
         try {
-            // Create a blob from base64
-            const response = await fetch(`data:image/png;base64,${processedImage}`);
+            // Normalize image data - handle both base64 and data URLs
+            const imageData = processedImage.startsWith('data:') 
+                ? processedImage 
+                : `data:image/png;base64,${processedImage}`;
+            
+            // Create a blob from the data URL
+            const response = await fetch(imageData);
             const blob = await response.blob();
 
             // Create download link
@@ -70,15 +88,28 @@ export default function ImagePreview({ originalImage, processedImage }: ImagePre
             <div className="relative bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 rounded-lg overflow-hidden border border-purple-200/50 dark:border-purple-800/30" style={{ minHeight: '400px' }}>
                 {(originalImage || processedImage) ? (
                     <div className="flex items-center justify-center p-4">
-                        <img
-                            src={`data:image/png;base64,${
-                                activeView === 'processed' && processedImage
-                                    ? processedImage
-                                    : originalImage
-                            }`}
-                            alt="Preview"
-                            className="max-w-full max-h-[500px] lg:max-h-[600px] object-contain rounded-lg shadow-xl"
-                        />
+                        {(() => {
+                            // Determine which image to show
+                            const imageToShow = activeView === 'processed' && processedImage 
+                                ? processedImage 
+                                : originalImage;
+                            
+                            // If no image available, don't render
+                            if (!imageToShow) return null;
+                            
+                            // Normalize image data - handle both base64 and data URLs
+                            const imageSrc = imageToShow.startsWith('data:') 
+                                ? imageToShow 
+                                : `data:image/png;base64,${imageToShow}`;
+                            
+                            return (
+                                <img
+                                    src={imageSrc}
+                                    alt="Preview"
+                                    className="max-w-full max-h-[500px] lg:max-h-[600px] object-contain rounded-lg shadow-xl"
+                                />
+                            );
+                        })()}
                     </div>
                 ) : (
                     <div className="flex items-center justify-center h-[400px]">
@@ -97,22 +128,27 @@ export default function ImagePreview({ originalImage, processedImage }: ImagePre
 
             {/* Action Buttons */}
             {processedImage && (
-                <div className="mt-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                    <button
-                        onClick={saveImage}
-                        className="flex-1 py-2 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-lg text-sm lg:text-base font-medium hover:from-cyan-600 hover:to-cyan-700 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                    >
-                        💾 Save Image
-                    </button>
-                    <button
-                        className="flex-1 py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-white rounded-lg text-sm lg:text-base font-medium hover:from-amber-500 hover:to-amber-600 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                        onClick={() => {
-                            // Future: Set as wallpaper functionality
-                            alert('Set as wallpaper feature coming soon!');
-                        }}
-                    >
-                        🖼️ Set as Wallpaper
-                    </button>
+                <div className="mt-4">
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                        <button
+                            onClick={saveImage}
+                            className="flex-1 py-2 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-lg text-sm lg:text-base font-medium hover:from-cyan-600 hover:to-cyan-700 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+                        >
+                            💾 Save Image
+                        </button>
+                        <button
+                            className="flex-1 py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-white rounded-lg text-sm lg:text-base font-medium opacity-60 cursor-not-allowed"
+                            type="button"
+                            disabled
+                            aria-disabled="true"
+                            title="Set as wallpaper feature coming soon"
+                        >
+                            🖼️ Set as Wallpaper
+                        </button>
+                    </div>
+                    <p className="mt-2 text-xs lg:text-sm text-purple-500 dark:text-purple-400 text-center">
+                        Set as wallpaper feature coming soon.
+                    </p>
                 </div>
             )}
 

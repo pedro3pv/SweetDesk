@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { ClassifyImage, UpscaleImage, ProcessImage } from '@wailsjs/go/main/App';
+import { ProcessImage } from '@wailsjs/go/main/App';
 
 interface ProcessingPanelProps {
     imageData: string;
     isProcessing: boolean;
     onProcessStart: () => void;
     onProcessComplete: (result: string) => void;
+    onProcessEnd?: () => void;
+    onProcessError?: (error: Error) => void;
 }
 
 export default function ProcessingPanel({
@@ -15,6 +17,8 @@ export default function ProcessingPanel({
     isProcessing,
     onProcessStart,
     onProcessComplete,
+    onProcessEnd,
+    onProcessError,
 }: ProcessingPanelProps) {
     const [targetResolution, setTargetResolution] = useState('4K');
     const [useSeamCarving, setUseSeamCarving] = useState(false);
@@ -27,26 +31,21 @@ export default function ProcessingPanel({
         setProgress('Starting processing...');
 
         try {
-            // Step 1: Classify
+            // Step 1: Classify (handled internally by ProcessImage; this is just UX)
             setProgress('🔍 Classifying image type...');
-            const imageType = await ClassifyImage(imageData);
-            
-            setProgress(`📊 Detected: ${imageType === 'anime' ? '🎨 Anime' : '📷 Photo'}`);
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Step 2: Upscale
+            // Step 2: Upscale (handled internally by ProcessImage; this is just UX)
             setProgress('🚀 Upscaling to ' + targetResolution + '...');
-            const scale = targetResolution === '8K' ? 8 : targetResolution === '5K' ? 5 : 4;
-            
-            const upscaled = await UpscaleImage(imageData, imageType, scale);
-            
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             setProgress('✨ Adjusting aspect ratio...');
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Step 3: Full processing
+            // Step 3: Full processing (classification + upscale + adjustments in backend)
             setProgress('🎨 Finalizing...');
             const result = await ProcessImage(
-                upscaled,
+                imageData,
                 targetResolution,
                 useSeamCarving
             );
@@ -54,10 +53,15 @@ export default function ProcessingPanel({
             setProgress('✅ Processing complete!');
             onProcessComplete(result);
             
-            setTimeout(() => setProgress(''), 2000);
+            setTimeout(() => {
+                setProgress('');
+                onProcessEnd?.();
+            }, 2000);
         } catch (error) {
             console.error('Processing failed:', error);
-            setProgress('❌ Processing failed: ' + (error as Error).message);
+            const errorObj = error as Error;
+            setProgress('❌ Processing failed: ' + errorObj.message);
+            onProcessError?.(errorObj);
             setTimeout(() => setProgress(''), 3000);
         }
     };
