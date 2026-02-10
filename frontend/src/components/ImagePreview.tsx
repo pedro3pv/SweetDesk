@@ -30,6 +30,10 @@ export default function ImagePreview({ originalImage, processedImage }: ImagePre
         else if (!processedImage && originalImage) {
             setActiveView('original');
         }
+        // If both images are gone, reset to default
+        else if (!originalImage && !processedImage) {
+            setActiveView('original');
+        }
     }, [originalImage, processedImage]);
 
     const saveImage = async () => {
