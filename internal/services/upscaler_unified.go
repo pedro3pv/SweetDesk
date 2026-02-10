@@ -1,6 +1,9 @@
-package upscaler
+package services
 
 import (
+	"bytes"
+	"context"
+	"embed"
 	"fmt"
 	"image"
 	"image/color"
@@ -38,9 +41,13 @@ type UpscaleOptions struct {
 
 	// KeepAspectRatio: mantém proporção ao usar TargetWidth/Height
 	KeepAspectRatio bool
+
+	// Format: formato de saída ("png", "jpg")
+	Format string
 }
 
 type Upscaler struct {
+	ctx          context.Context
 	modelType    UpscalerType
 	modelPath    string
 	session      *ort.Session[float32]
@@ -52,58 +59,38 @@ type Upscaler struct {
 	modelScale   int // Scale nativo do modelo
 }
 
-func NewUpscaler(modelType UpscalerType, modelDir string, onnxLibPath string) (*Upscaler, error) {
+// NewUpscaler cria um novo upscaler com modelo embutido
+func NewUpscaler(ctx context.Context, modelType UpscalerType, modelsFS embed.FS, onnxLibPath string) (*Upscaler, error) {
 	u := &Upscaler{
+		ctx:        ctx,
 		modelType:  modelType,
 		tileSize:   512,
 		modelScale: 4,
 	}
 
+	var modelPath string
 	switch modelType {
 	case RealCUGAN:
-		u.modelPath = filepath.Join(modelDir, "realcugan", "realcugan-pro.onnx")
+		modelPath = "models/realcugan/realcugan-pro.onnx"
 	case LSDIR:
-		u.modelPath = filepath.Join(modelDir, "lsdir", "4xLSDIR.onnx")
+		modelPath = "models/lsdir/4xLSDIR.onnx"
 	default:
 		return nil, fmt.Errorf("tipo de upscaler desconhecido: %s", modelType)
 	}
 
-	if _, err := os.Stat(u.modelPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("modelo não encontrado: %s", u.modelPath)
+	// Lê modelo da memória (embed.FS)
+	modelData, err := modelsFS.ReadFile(modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("modelo não encontrado no embed: %w", err)
 	}
 
 	ort.SetSharedLibraryPath(onnxLibPath)
 
-	log.Printf("Inspecionando modelo: %s", u.modelPath)
-	inputs, outputs, err := ort.GetInputOutputInfo(u.modelPath)
-	if err != nil {
-		return nil, fmt.Errorf("falha ao obter info do modelo: %w", err)
-	}
+	// Valores hardcoded (ajuste conforme seus modelos)
+	u.inputName = "input"
+	u.outputName = "output"
 
-	if len(inputs) == 0 || len(outputs) == 0 {
-		return nil, fmt.Errorf("modelo sem inputs ou outputs válidos")
-	}
-
-	u.inputName = inputs[0].Name
-	u.outputName = outputs[0].Name
-
-	log.Printf("  Input: %s %v", u.inputName, inputs[0].Dimensions)
-	log.Printf("  Output: %s %v", u.outputName, outputs[0].Dimensions)
-
-	if len(inputs[0].Dimensions) >= 4 {
-		if inputs[0].Dimensions[2] > 0 {
-			u.tileSize = int(inputs[0].Dimensions[2])
-			log.Printf("  Tile size: %d", u.tileSize)
-		}
-	}
-
-	if len(outputs[0].Dimensions) >= 4 && len(inputs[0].Dimensions) >= 4 {
-		if outputs[0].Dimensions[2] > 0 && inputs[0].Dimensions[2] > 0 {
-			u.modelScale = int(outputs[0].Dimensions[2] / inputs[0].Dimensions[2])
-			log.Printf("  Scale nativo: %dx", u.modelScale)
-		}
-	}
-
+	// Cria tensores
 	inputShape := ort.NewShape(1, 3, int64(u.tileSize), int64(u.tileSize))
 	inputData := make([]float32, 1*3*u.tileSize*u.tileSize)
 	u.inputTensor, err = ort.NewTensor(inputShape, inputData)
@@ -119,13 +106,15 @@ func NewUpscaler(modelType UpscalerType, modelDir string, onnxLibPath string) (*
 		return nil, fmt.Errorf("falha ao criar output tensor: %w", err)
 	}
 
-	u.session, err = ort.NewSession[float32](
-		u.modelPath,
+	// Cria sessão ONNX a partir dos bytes
+	u.session, err = ort.NewSessionWithONNXData[float32](
+		modelData,
 		[]string{u.inputName},
 		[]string{u.outputName},
 		[]*ort.Tensor[float32]{u.inputTensor},
 		[]*ort.Tensor[float32]{u.outputTensor},
 	)
+
 	if err != nil {
 		u.inputTensor.Destroy()
 		u.outputTensor.Destroy()
@@ -140,7 +129,7 @@ func (u *Upscaler) Upscale(inputPath, outputPath string) error {
 	return u.UpscaleWithOptions(inputPath, outputPath, nil)
 }
 
-// UpscaleWithOptions permite controle total da resolução
+// UpscaleWithOptions permite controle total da resolução (arquivo -> arquivo)
 func (u *Upscaler) UpscaleWithOptions(inputPath, outputPath string, opts *UpscaleOptions) error {
 	imgFile, err := os.Open(inputPath)
 	if err != nil {
@@ -153,26 +142,79 @@ func (u *Upscaler) UpscaleWithOptions(inputPath, outputPath string, opts *Upscal
 		return fmt.Errorf("falha ao decodificar imagem: %w", err)
 	}
 
+	result, err := u.upscaleImage(imgData, opts)
+	if err != nil {
+		return err
+	}
+
+	return u.saveImage(result, outputPath)
+}
+
+// UpscaleBytes processa imagem a partir de bytes e retorna bytes
+func (u *Upscaler) UpscaleBytes(imageData []byte, opts *UpscaleOptions) ([]byte, error) {
+	// Decodifica imagem
+	imgData, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("falha ao decodificar imagem: %w", err)
+	}
+
+	// Processa
+	result, err := u.upscaleImage(imgData, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Codifica resultado
+	var buf bytes.Buffer
+	format := "png"
+	if opts != nil && opts.Format != "" {
+		format = opts.Format
+	}
+
+	switch format {
+	case "png":
+		if err := png.Encode(&buf, result); err != nil {
+			return nil, fmt.Errorf("falha ao codificar PNG: %w", err)
+		}
+	default:
+		if err := png.Encode(&buf, result); err != nil {
+			return nil, fmt.Errorf("falha ao codificar imagem: %w", err)
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
+// upscaleImage - lógica interna de processamento
+func (u *Upscaler) upscaleImage(imgData image.Image, opts *UpscaleOptions) (image.Image, error) {
+	// Verifica contexto
+	select {
+	case <-u.ctx.Done():
+		return nil, u.ctx.Err()
+	default:
+	}
+
 	bounds := imgData.Bounds()
 	width, height := bounds.Dx(), bounds.Dy()
 
 	// Calcula resolução de saída
 	targetWidth, targetHeight := u.calculateOutputSize(width, height, opts)
-
 	log.Printf("📐 Entrada: %dx%d", width, height)
 	log.Printf("🎯 Saída alvo: %dx%d", targetWidth, targetHeight)
 
-	// Primeiro faz upscale com o modelo
+	// Upscale com o modelo
 	var upscaled image.Image
+	var err error
+
 	if width <= u.tileSize && height <= u.tileSize {
 		upscaled, err = u.processTile(imgData)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		upscaled, err = u.processTiled(imgData)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -185,12 +227,11 @@ func (u *Upscaler) UpscaleWithOptions(inputPath, outputPath string, opts *Upscal
 		upscaled = final
 	}
 
-	return u.saveImage(upscaled, outputPath)
+	return upscaled, nil
 }
 
 // calculateOutputSize determina a resolução de saída
 func (u *Upscaler) calculateOutputSize(inputWidth, inputHeight int, opts *UpscaleOptions) (int, int) {
-	// Usa opções padrão se não fornecidas
 	if opts == nil {
 		opts = &UpscaleOptions{ScaleFactor: float64(u.modelScale)}
 	}
@@ -200,27 +241,22 @@ func (u *Upscaler) calculateOutputSize(inputWidth, inputHeight int, opts *Upscal
 	// Prioridade 1: Resolução específica
 	if opts.TargetWidth > 0 || opts.TargetHeight > 0 {
 		if opts.KeepAspectRatio {
-			// Mantém proporção
 			if opts.TargetWidth > 0 && opts.TargetHeight > 0 {
-				// Ambos definidos: usa o que couber mantendo proporção
 				scaleW := float64(opts.TargetWidth) / float64(inputWidth)
 				scaleH := float64(opts.TargetHeight) / float64(inputHeight)
 				scale := math.Min(scaleW, scaleH)
 				targetWidth = int(float64(inputWidth) * scale)
 				targetHeight = int(float64(inputHeight) * scale)
 			} else if opts.TargetWidth > 0 {
-				// Só largura: calcula altura
 				scale := float64(opts.TargetWidth) / float64(inputWidth)
 				targetWidth = opts.TargetWidth
 				targetHeight = int(float64(inputHeight) * scale)
 			} else {
-				// Só altura: calcula largura
 				scale := float64(opts.TargetHeight) / float64(inputHeight)
 				targetWidth = int(float64(inputWidth) * scale)
 				targetHeight = opts.TargetHeight
 			}
 		} else {
-			// Força dimensões exatas (pode distorcer)
 			targetWidth = opts.TargetWidth
 			targetHeight = opts.TargetHeight
 			if targetWidth == 0 {
@@ -252,7 +288,7 @@ func (u *Upscaler) calculateOutputSize(inputWidth, inputHeight int, opts *Upscal
 				targetHeight = opts.MaxResolution
 				targetWidth = int(float64(targetWidth) * scale)
 			}
-			log.Printf("⚠️  Limitando a %dx%d (MaxResolution=%d)", targetWidth, targetHeight, opts.MaxResolution)
+			log.Printf("⚠️ Limitando a %dx%d (MaxResolution=%d)", targetWidth, targetHeight, opts.MaxResolution)
 		}
 	}
 
@@ -260,12 +296,21 @@ func (u *Upscaler) calculateOutputSize(inputWidth, inputHeight int, opts *Upscal
 }
 
 func (u *Upscaler) processTile(img image.Image) (image.Image, error) {
+	// Verifica contexto
+	select {
+	case <-u.ctx.Done():
+		return nil, u.ctx.Err()
+	default:
+	}
+
 	bounds := img.Bounds()
 	width, height := bounds.Dx(), bounds.Dy()
 
+	// Redimensiona para tileSize
 	resized := image.NewRGBA(image.Rect(0, 0, u.tileSize, u.tileSize))
 	draw.BiLinear.Scale(resized, resized.Bounds(), img, bounds, draw.Over, nil)
 
+	// Converte para tensor
 	data := u.inputTensor.GetData()
 	for y := 0; y < u.tileSize; y++ {
 		for x := 0; x < u.tileSize; x++ {
@@ -276,10 +321,12 @@ func (u *Upscaler) processTile(img image.Image) (image.Image, error) {
 		}
 	}
 
+	// Inferência
 	if err := u.session.Run(); err != nil {
 		return nil, fmt.Errorf("falha na inferência: %w", err)
 	}
 
+	// Converte resultado
 	outputData := u.outputTensor.GetData()
 	outputSize := u.tileSize * u.modelScale
 	result := image.NewRGBA(image.Rect(0, 0, outputSize, outputSize))
@@ -293,6 +340,7 @@ func (u *Upscaler) processTile(img image.Image) (image.Image, error) {
 		}
 	}
 
+	// Ajusta se entrada era menor que tileSize
 	if width < u.tileSize || height < u.tileSize {
 		finalWidth := width * u.modelScale
 		finalHeight := height * u.modelScale
@@ -317,20 +365,30 @@ func (u *Upscaler) processTiled(img image.Image) (image.Image, error) {
 
 	for y := 0; y < height; y += u.tileSize {
 		for x := 0; x < width; x += u.tileSize {
+			// Verifica cancelamento
+			select {
+			case <-u.ctx.Done():
+				return nil, u.ctx.Err()
+			default:
+			}
+
 			currentTile++
 			tileWidth := min(u.tileSize, width-x)
 			tileHeight := min(u.tileSize, height-y)
 
 			log.Printf("  Tile %d/%d", currentTile, totalTiles)
 
+			// Extrai tile
 			tile := image.NewRGBA(image.Rect(0, 0, tileWidth, tileHeight))
 			draw.Draw(tile, tile.Bounds(), img, image.Point{X: x, Y: y}, draw.Src)
 
+			// Processa tile
 			processedTile, err := u.processTile(tile)
 			if err != nil {
 				return nil, fmt.Errorf("falha ao processar tile: %w", err)
 			}
 
+			// Cola no resultado
 			draw.Draw(result,
 				image.Rect(x*u.modelScale, y*u.modelScale, (x+tileWidth)*u.modelScale, (y+tileHeight)*u.modelScale),
 				processedTile,
@@ -363,6 +421,19 @@ func (u *Upscaler) saveImage(img image.Image, path string) error {
 	return nil
 }
 
+// GetRecommendedModel retorna o modelo recomendado baseado no tipo de imagem
+func GetRecommendedModel(imageType string) UpscalerType {
+	switch imageType {
+	case "anime":
+		return RealCUGAN
+	case "photo":
+		return LSDIR
+	default:
+		return RealCUGAN
+	}
+}
+
+// Close libera recursos
 func (u *Upscaler) Close() {
 	if u.session != nil {
 		u.session.Destroy()
@@ -375,6 +446,7 @@ func (u *Upscaler) Close() {
 	}
 }
 
+// Helper functions
 func clamp(v, min, max float32) float32 {
 	if v < min {
 		return min
