@@ -6,7 +6,6 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 // App struct
@@ -16,7 +15,6 @@ type App struct {
 	upscaler       *services.Upscaler
 	pixabayKey     string
 	modelsFS       embed.FS
-	tempLibPath    string
 }
 
 // NewApp creates a new App application struct
@@ -33,46 +31,17 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize services
 	a.imageProcessor = services.NewImageProcessor(ctx)
 
-	// Extract and initialize ONNX library
-	onnxLibPath, err := a.extractONNXLibrary()
-	if err != nil {
-		fmt.Printf("Failed to extract ONNX library: %v\n", err)
-		return
-	}
-	a.tempLibPath = onnxLibPath
-
-	// Initialize upscaler with RealCUGAN by default
-	upscaler, err := services.NewUpscaler(ctx, services.RealCUGAN, a.modelsFS, onnxLibPath)
+	// Initialize upscaler (pure Go, no DLL needed!)
+	upscaler, err := services.NewUpscaler(ctx, services.RealCUGAN, a.modelsFS)
 	if err != nil {
 		fmt.Printf("Failed to initialize upscaler: %v\n", err)
 	} else {
 		a.upscaler = upscaler
+		fmt.Println("✅ Upscaler initialized (pure Go, no external dependencies)")
 	}
 
 	// Get Pixabay API key from environment
 	a.pixabayKey = os.Getenv("PIXABAY_API_KEY")
-}
-
-// extractONNXLibrary extracts the embedded ONNX library to temp directory
-func (a *App) extractONNXLibrary() (string, error) {
-	// Get platform-specific library data (defined in app_*.go files)
-	libData, fileName := getONNXLibrary()
-
-	// Create temp directory
-	tempDir, err := os.MkdirTemp("", "sweetdesk-onnx-*")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %w", err)
-	}
-
-	// Write library to temp file
-	libPath := filepath.Join(tempDir, fileName)
-	if err := os.WriteFile(libPath, libData, 0755); err != nil {
-		os.RemoveAll(tempDir)
-		return "", fmt.Errorf("failed to write library: %w", err)
-	}
-
-	fmt.Printf("✅ ONNX Runtime extracted to: %s\n", libPath)
-	return libPath, nil
 }
 
 // domReady is called after front-end resources have been loaded
@@ -86,15 +55,6 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 	if a.upscaler != nil {
 		a.upscaler.Close()
 	}
-
-	// Clean up temp library file
-	if a.tempLibPath != "" {
-		tempDir := filepath.Dir(a.tempLibPath)
-		if err := os.RemoveAll(tempDir); err != nil {
-			fmt.Printf("Failed to cleanup temp dir: %v\n", err)
-		}
-	}
-
 	return false
 }
 
