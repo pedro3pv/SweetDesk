@@ -106,16 +106,16 @@ export default function Home() {
     return (
         <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
             {/* Top Navigation */}
-            <nav className="flex items-center justify-between px-5 py-3 border-b border-border bg-card">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-sm font-bold text-foreground tracking-tight">SWEETDESK</h1>
-                    <span className="text-xs text-muted-foreground">Wallpaper Processing</span>
+            <nav className="flex items-center justify-between px-6 py-4 border-b border-border bg-card">
+                <div className="flex items-center gap-6">
+                    <h1 className="text-base lg:text-lg font-bold text-foreground tracking-tight">SWEETDESK</h1>
+                    <span className="text-sm lg:text-base text-muted-foreground">Wallpaper Processing</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     {/* Search Tab */}
                     <button
                         onClick={() => setView('search')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        className={`px-4 py-2 rounded-md text-sm lg:text-base font-medium transition-colors ${
                             view === 'search'
                                 ? 'bg-primary text-primary-foreground'
                                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -126,7 +126,7 @@ export default function Home() {
                     {/* Upload Tab */}
                     <button
                         onClick={() => setView('upload')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        className={`px-4 py-2 rounded-md text-sm lg:text-base font-medium transition-colors ${
                             view === 'upload'
                                 ? 'bg-primary text-primary-foreground'
                                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -137,7 +137,7 @@ export default function Home() {
                     {/* Download List Tab */}
                     <button
                         onClick={() => setView('download-list')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors relative ${
+                        className={`px-4 py-2 rounded-md text-sm lg:text-base font-medium transition-colors relative ${
                             view === 'download-list' || view === 'folder-select' || view === 'processing'
                                 ? 'bg-primary text-primary-foreground'
                                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -145,7 +145,7 @@ export default function Home() {
                     >
                         Lista
                         {downloadItems.length > 0 && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center text-[9px] font-bold bg-accent text-accent-foreground rounded-full">
+                            <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs font-bold bg-accent text-accent-foreground rounded-full">
                                 {downloadItems.length}
                             </span>
                         )}
