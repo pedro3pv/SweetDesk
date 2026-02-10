@@ -48,9 +48,15 @@ export default function ProcessingPanel({
                     aspectW = customAspectW;
                     aspectH = customAspectH;
                 } else if (aspectRatio !== 'auto') {
-                    const [w, h] = aspectRatio.split(':').map(Number);
-                    aspectW = w;
-                    aspectH = h;
+                    const parts = aspectRatio.split(':');
+                    if (parts.length === 2) {
+                        const w = parseInt(parts[0]);
+                        const h = parseInt(parts[1]);
+                        if (!isNaN(w) && !isNaN(h)) {
+                            aspectW = w;
+                            aspectH = h;
+                        }
+                    }
                 }
 
                 // @ts-ignore
@@ -135,7 +141,7 @@ export default function ProcessingPanel({
                             <input
                                 type="number"
                                 value={customWidth}
-                                onChange={(e) => setCustomWidth(parseInt(e.target.value) || 0)}
+                                onChange={(e) => setCustomWidth(Math.max(1, parseInt(e.target.value) || customWidth))}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 min="1"
                                 max="15360"
@@ -148,7 +154,7 @@ export default function ProcessingPanel({
                             <input
                                 type="number"
                                 value={customHeight}
-                                onChange={(e) => setCustomHeight(parseInt(e.target.value) || 0)}
+                                onChange={(e) => setCustomHeight(Math.max(1, parseInt(e.target.value) || customHeight))}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 min="1"
                                 max="8640"

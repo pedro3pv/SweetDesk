@@ -23,15 +23,15 @@ type AspectRatioOptions struct {
 	MaxDeltaBySeams int
 }
 
-// ResizeOptions define opções de redimensionamento exato
+// ResizeOptions define resize options for exact dimensions
 type ResizeOptions struct {
-	// TargetWidth: largura exata desejada
+	// TargetWidth: exact desired width
 	TargetWidth int
 
-	// TargetHeight: altura exata desejada
+	// TargetHeight: exact desired height
 	TargetHeight int
 
-	// MaxDeltaBySeams: máximo de pixels alterados por seams (limite de segurança)
+	// MaxDeltaBySeams: maximum pixels altered by seams (safety limit)
 	MaxDeltaBySeams int
 }
 
@@ -180,7 +180,7 @@ func (sc *SeamCarver) reduceHorizontal(width, height int, opts AspectRatioOption
 	return result, nil
 }
 
-// ResizeToExactDimensions redimensiona a imagem para dimensões exatas
+// ResizeToExactDimensions resizes the image to exact dimensions
 func (sc *SeamCarver) ResizeToExactDimensions(opts ResizeOptions) (image.Image, error) {
 	bounds := sc.img.Bounds()
 	width := bounds.Dx()
@@ -190,7 +190,7 @@ func (sc *SeamCarver) ResizeToExactDimensions(opts ResizeOptions) (image.Image, 
 	log.Printf("🎯 Target: %dx%d", opts.TargetWidth, opts.TargetHeight)
 
 	if width == opts.TargetWidth && height == opts.TargetHeight {
-		log.Printf("ℹ️  Dimensões já estão corretas")
+		log.Printf("ℹ️  Dimensions are already correct")
 		return sc.img, nil
 	}
 
@@ -248,7 +248,7 @@ func (sc *SeamCarver) ResizeToExactDimensions(opts ResizeOptions) (image.Image, 
 	return result, nil
 }
 
-// resizeWidth redimensiona a largura da imagem
+// resizeWidth resizes the image width
 func resizeWidth(img image.Image, targetWidth int) image.Image {
 	bounds := img.Bounds()
 	width := bounds.Dx()
@@ -270,7 +270,7 @@ func resizeWidth(img image.Image, targetWidth int) image.Image {
 	return result
 }
 
-// resizeHeight redimensiona a altura da imagem
+// resizeHeight resizes the image height
 func resizeHeight(img image.Image, targetHeight int) image.Image {
 	bounds := img.Bounds()
 	width := bounds.Dx()
@@ -292,7 +292,7 @@ func resizeHeight(img image.Image, targetHeight int) image.Image {
 	return result
 }
 
-// scaleToWidth escala a imagem para uma largura específica mantendo aspect ratio
+// scaleToWidth scales the image to a specific width maintaining aspect ratio
 func scaleToWidth(img image.Image, targetWidth int) image.Image {
 	bounds := img.Bounds()
 	width := bounds.Dx()
@@ -319,7 +319,7 @@ func scaleToWidth(img image.Image, targetWidth int) image.Image {
 	return result
 }
 
-// scaleToHeight escala a imagem para uma altura específica mantendo aspect ratio
+// scaleToHeight scales the image to a specific height maintaining aspect ratio
 func scaleToHeight(img image.Image, targetHeight int) image.Image {
 	bounds := img.Bounds()
 	width := bounds.Dx()

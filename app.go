@@ -274,7 +274,7 @@ func (a *App) ProcessImageWithCustomResolution(base64Data string, targetWidth in
 		// Calculate required scale factor
 		scaleW := float64(finalWidth) / float64(currentWidth)
 		scaleH := float64(finalHeight) / float64(currentHeight)
-		requiredScale := int(math.Max(scaleW, scaleH))
+		requiredScale := int(math.Ceil(math.Max(scaleW, scaleH)))
 		
 		if requiredScale < 2 {
 			requiredScale = 2
