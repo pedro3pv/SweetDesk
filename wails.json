@@ -6,6 +6,9 @@
     "frontend:build": "bun run build",
     "frontend:dev:watcher": "bun run dev",
     "frontend:dev:serverUrl": "auto",
+    "preBuildHooks": {
+        "*/*": "./scripts/download-models.sh"
+    },
     "author": {
         "name": "pedro3pv",
         "email": "pedro_atm3p@hotmail.com"
