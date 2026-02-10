@@ -1,73 +1,104 @@
 'use client';
 
-import { useCallback } from 'react';
+import React from "react"
+
+import { useCallback, useState } from 'react';
+import type { ImageResult } from '@/lib/types';
 
 interface ImageUploadProps {
-    onImageSelect: (data: string) => void;
+    onImageSelect: (image: ImageResult) => void;
+    onAddToList: (image: ImageResult) => void;
 }
 
-export default function ImageUpload({ onImageSelect }: ImageUploadProps) {
-    const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+export default function ImageUpload({ onImageSelect, onAddToList }: ImageUploadProps) {
+    const [isDragging, setIsDragging] = useState(false);
 
+    const processFile = useCallback((file: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
-            const result = event.target?.result as string;
-            // Remove data:image/...;base64, prefix
-            const base64 = result.split(',')[1];
-            onImageSelect(base64);
+            const dataUrl = event.target?.result as string;
+            const img = new window.Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const image: ImageResult = {
+                    id: `upload-${Date.now()}`,
+                    url: dataUrl,
+                    downloadURL: dataUrl,
+                    previewURL: dataUrl,
+                    width: img.naturalWidth,
+                    height: img.naturalHeight,
+                    author: 'Local',
+                    source: 'upload',
+                    tags: ['upload'],
+                    description: file.name,
+                };
+                onImageSelect(image);
+            };
+            img.src = dataUrl;
         };
         reader.readAsDataURL(file);
     }, [onImageSelect]);
+
+    const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) processFile(file);
+    }, [processFile]);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
+        setIsDragging(false);
         const file = e.dataTransfer.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const result = event.target?.result as string;
-            const base64 = result.split(',')[1];
-            onImageSelect(base64);
-        };
-        reader.readAsDataURL(file);
-    }, [onImageSelect]);
+        if (file) processFile(file);
+    }, [processFile]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
+        setIsDragging(true);
+    }, []);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
     }, []);
 
     return (
-        <div className="space-y-4">
-            <div
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                className="border-2 border-dashed border-purple-300 dark:border-dark-border rounded-xl p-6 lg:p-8 text-center hover:border-purple-500 dark:hover:border-purple-600 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-all cursor-pointer"
-            >
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    id="file-upload"
-                />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                    <div className="space-y-2">
-                        <div className="text-4xl">📁</div>
-                        <p className="text-sm text-purple-700 dark:text-purple-300">
-                            Drop an image here or click to browse
-                        </p>
-                        <p className="text-xs text-purple-500 dark:text-purple-400">
-                            Supports: JPG, PNG, WebP
-                        </p>
-                    </div>
-                </label>
+        <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+                <h2 className="text-base font-semibold text-foreground tracking-tight">Adicionar Arquivo</h2>
             </div>
 
-            <div className="text-center text-xs lg:text-sm text-purple-600 dark:text-purple-400">
-                <p>Maximum file size: 10MB</p>
+            {/* Drop Zone */}
+            <div className="flex-1 flex items-center justify-center p-8">
+                <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className={`w-full max-w-lg aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-4 transition-colors cursor-pointer ${
+                        isDragging
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-muted-foreground'
+                    }`}
+                >
+                    <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        id="file-upload"
+                    />
+                    <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-4">
+                        <svg className="w-12 h-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                        </svg>
+                        <div className="text-center">
+                            <p className="text-sm text-foreground font-medium">Arraste para aqui</p>
+                            <p className="text-xs text-muted-foreground mt-1">ou clique para selecionar</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">JPG, PNG, WebP</p>
+                    </label>
+                </div>
             </div>
         </div>
     );
