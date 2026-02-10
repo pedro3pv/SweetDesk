@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import React from "react"
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -14,8 +15,12 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-    title: "SweetDesk - AI-Powered Wallpaper Processing",
-    description: "Transform wallpapers to 4K using AI - anime and photo upscaling",
+    title: "SweetDesk - Wallpaper Processing",
+    description: "Busque, processe e salve wallpapers em alta resolucao com upscale AI",
+};
+
+export const viewport: Viewport = {
+    themeColor: "#0a0a0c",
 };
 
 export default function RootLayout({
@@ -24,7 +29,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
+        <html lang="pt-BR">
             <body
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
             >
