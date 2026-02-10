@@ -14,6 +14,8 @@ import (
 
 //go:embed all:frontend/out
 var assets embed.FS
+
+//go:embed models/**/*.onnx
 var modelsFS embed.FS
 
 //go:embed build/appicon.png
@@ -21,7 +23,7 @@ var icon []byte
 
 func main() {
 	// Create an instance of the app structure
-	app := NewApp()
+	app := NewApp(modelsFS)
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -52,16 +54,13 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
-		// Windows platform specific options
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
 			DisableWindowIcon:    false,
-			// DisableFramelessWindowDecorations: false,
-			WebviewUserDataPath: "",
-			ZoomFactor:          1.0,
+			WebviewUserDataPath:  "",
+			ZoomFactor:           1.0,
 		},
-		// Mac platform specific options
 		Mac: &mac.Options{
 			TitleBar: &mac.TitleBar{
 				TitlebarAppearsTransparent: true,
