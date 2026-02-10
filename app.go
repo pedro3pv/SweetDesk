@@ -237,7 +237,6 @@ func (a *App) ProcessImageWithCustomResolution(base64Data string, targetWidth in
 		if err == nil {
 			bounds := img.Bounds()
 			currentWidth := bounds.Dx()
-			currentHeight := bounds.Dy()
 			
 			aspectRatio := float64(aspectRatioW) / float64(aspectRatioH)
 			

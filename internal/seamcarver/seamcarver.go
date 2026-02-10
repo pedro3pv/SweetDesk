@@ -219,7 +219,6 @@ func (sc *SeamCarver) ResizeToExactDimensions(opts ResizeOptions) (image.Image, 
 
 	// Depois ajusta a altura, se necessário
 	resultBounds := result.Bounds()
-	currentWidth := resultBounds.Dx()
 	currentHeight := resultBounds.Dy()
 
 	if currentHeight != opts.TargetHeight {
