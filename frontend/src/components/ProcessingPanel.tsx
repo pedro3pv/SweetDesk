@@ -192,7 +192,7 @@ export default function ProcessingPanel({
                                     <input
                                         type="number"
                                         value={customAspectW}
-                                        onChange={(e) => setCustomAspectW(parseInt(e.target.value) || 1)}
+                                        onChange={(e) => setCustomAspectW(Math.max(1, parseInt(e.target.value) || customAspectW))}
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                         min="1"
                                     />
@@ -204,7 +204,7 @@ export default function ProcessingPanel({
                                     <input
                                         type="number"
                                         value={customAspectH}
-                                        onChange={(e) => setCustomAspectH(parseInt(e.target.value) || 1)}
+                                        onChange={(e) => setCustomAspectH(Math.max(1, parseInt(e.target.value) || customAspectH))}
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                         min="1"
                                     />
