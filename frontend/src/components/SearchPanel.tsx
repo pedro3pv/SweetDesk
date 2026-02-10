@@ -55,7 +55,8 @@ export default function SearchPanel({ onImageSelect, onAddToList }: SearchPanelP
                         author: img.author,
                         source: img.source,
                         tags: img.tags || [],
-                        description: '', // Add if available in backend
+                        // Description field is not provided by backend ImageResult struct
+                        description: '',
                     })));
                 } else {
                     setResults([]);
