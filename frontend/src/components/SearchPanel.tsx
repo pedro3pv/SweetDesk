@@ -224,33 +224,37 @@ export default function SearchPanel({ onImageSelect, onAddToList }: SearchPanelP
                     {filteredResults.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
                             {filteredResults.map((image) => (
-                                <button
+                                <div
                                     key={image.id}
-                                    onClick={() => onImageSelect(image)}
-                                    className="group relative aspect-square rounded-lg overflow-hidden border border-border hover:border-primary transition-all focus:outline-none focus:ring-2 focus:ring-ring"
+                                    className="group relative aspect-square rounded-lg overflow-hidden border border-border hover:border-primary transition-all"
                                 >
-                                    <img
-                                        src={image.previewURL || "/placeholder.svg"}
-                                        alt={`By ${image.author}`}
-                                        className="w-full h-full object-cover"
-                                        crossOrigin="anonymous"
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
-                                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <p className="text-xs text-foreground truncate">{image.source}</p>
-                                    </div>
-                                    {/* Download icon on hover */}
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <span
-                                            onClick={(e) => { e.stopPropagation(); onAddToList(image); }}
-                                            className="inline-flex items-center justify-center w-8 h-8 bg-primary/80 text-primary-foreground rounded cursor-pointer hover:bg-primary"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                            </svg>
-                                        </span>
-                                    </div>
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => onImageSelect(image)}
+                                        className="w-full h-full focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
+                                        <img
+                                            src={image.previewURL || "/placeholder.svg"}
+                                            alt={`By ${image.author}`}
+                                            className="w-full h-full object-cover"
+                                            crossOrigin="anonymous"
+                                        />
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
+                                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <p className="text-xs text-foreground truncate">{image.source}</p>
+                                        </div>
+                                    </button>
+                                    {/* Add-to-list icon on hover */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); onAddToList(image); }}
+                                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center justify-center w-8 h-8 bg-primary/80 text-primary-foreground rounded hover:bg-primary focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                    </button>
+                                </div>
                             ))}
                         </div>
                     ) : (
