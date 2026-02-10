@@ -64,7 +64,7 @@ export default function ProcessingPanel({
                     }
                 }
 
-                // @ts-ignore
+                // @ts-expect-error - Wails Go bindings are not typed in TypeScript
                 result = await window.go.main.App.ProcessImageWithCustomResolution(
                     imageData,
                     targetW,
@@ -142,7 +142,20 @@ export default function ProcessingPanel({
                             <input
                                 type="number"
                                 value={customWidth}
-                                onChange={(e) => setCustomWidth(Math.max(1, parseInt(e.target.value) || customWidth))}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '') {
+                                        setCustomWidth(0);
+                                    } else {
+                                        const parsed = parseInt(val);
+                                        setCustomWidth(Math.max(1, isNaN(parsed) ? customWidth : parsed));
+                                    }
+                                }}
+                                onBlur={(e) => {
+                                    if (customWidth === 0) {
+                                        setCustomWidth(3840);
+                                    }
+                                }}
                                 className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-white dark:bg-dark-surface text-purple-900 dark:text-purple-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                 min="1"
                                 max="15360"
@@ -155,7 +168,20 @@ export default function ProcessingPanel({
                             <input
                                 type="number"
                                 value={customHeight}
-                                onChange={(e) => setCustomHeight(Math.max(1, parseInt(e.target.value) || customHeight))}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '') {
+                                        setCustomHeight(0);
+                                    } else {
+                                        const parsed = parseInt(val);
+                                        setCustomHeight(Math.max(1, isNaN(parsed) ? customHeight : parsed));
+                                    }
+                                }}
+                                onBlur={(e) => {
+                                    if (customHeight === 0) {
+                                        setCustomHeight(2160);
+                                    }
+                                }}
                                 className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-white dark:bg-dark-surface text-purple-900 dark:text-purple-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                 min="1"
                                 max="8640"
@@ -193,7 +219,20 @@ export default function ProcessingPanel({
                                     <input
                                         type="number"
                                         value={customAspectW}
-                                        onChange={(e) => setCustomAspectW(Math.max(1, parseInt(e.target.value) || customAspectW))}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '') {
+                                                setCustomAspectW(0);
+                                            } else {
+                                                const parsed = parseInt(val);
+                                                setCustomAspectW(Math.max(1, isNaN(parsed) ? customAspectW : parsed));
+                                            }
+                                        }}
+                                        onBlur={(e) => {
+                                            if (customAspectW === 0) {
+                                                setCustomAspectW(16);
+                                            }
+                                        }}
                                         className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-white dark:bg-dark-surface text-purple-900 dark:text-purple-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                                         min="1"
                                     />
@@ -205,7 +244,20 @@ export default function ProcessingPanel({
                                     <input
                                         type="number"
                                         value={customAspectH}
-                                        onChange={(e) => setCustomAspectH(Math.max(1, parseInt(e.target.value) || customAspectH))}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '') {
+                                                setCustomAspectH(0);
+                                            } else {
+                                                const parsed = parseInt(val);
+                                                setCustomAspectH(Math.max(1, isNaN(parsed) ? customAspectH : parsed));
+                                            }
+                                        }}
+                                        onBlur={(e) => {
+                                            if (customAspectH === 0) {
+                                                setCustomAspectH(9);
+                                            }
+                                        }}
                                         className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-white dark:bg-dark-surface text-purple-900 dark:text-purple-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                                         min="1"
                                     />
