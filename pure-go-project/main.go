@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"log"
+	"os"
 
 	"pure-go-project/internal/classifier"
 	"pure-go-project/internal/downloader"
+	"pure-go-project/internal/seamcarver"
 	"pure-go-project/internal/upscaler"
 )
 
@@ -81,13 +84,81 @@ func main() {
 		MaxResolution: 2560, // Não ultrapassa 2560 em nenhuma dimensão
 	})
 
-	// EXEMPLO 6: Força dimensões exatas (pode distorcer)
-	fmt.Println("\n=== 6. Força 1024x1024 (quadrado) ===")
-	ups.UpscaleWithOptions(inputImage, "output_square.png", &upscaler.UpscaleOptions{
+	// EXEMPLO 6: Workflow completo - seam carving + upscale para resolução específica
+	fmt.Println("\n=== 6. Workflow completo: 16:9 → Upscale → 4K ===")
+
+	// Carrega novamente
+	imgFile2, err := os.Open(inputImage)
+	if err != nil {
+		log.Fatalf("Erro: %v", err)
+	}
+	img2, _, err := image.Decode(imgFile2)
+	imgFile2.Close()
+	if err != nil {
+		log.Fatalf("Erro: %v", err)
+	}
+
+	// Ajusta aspect ratio
+	carver2 := seamcarver.NewSeamCarver(img2)
+	adjusted, err := carver2.AdjustAspectRatio(seamcarver.AspectRatioOptions{
+		TargetRatio:     16.0 / 9.0,
+		MaxDeltaBySeams: 300,
+	})
+	if err != nil {
+		log.Fatalf("Erro: %v", err)
+	}
+	carver2.SaveImage(adjusted, "temp_adjusted.png")
+
+	// Upscale para 4K (3840x2160)
+	if err := ups.UpscaleWithOptions("temp_adjusted.png", "output_4k_16x9.png", &upscaler.UpscaleOptions{
+		TargetWidth:     3840,
+		TargetHeight:    2160,
+		KeepAspectRatio: true,
+	}); err != nil {
+		log.Printf("Erro: %v", err)
+	}
+
+	// Limpa arquivo temporário
+	os.Remove("temp_adjusted.png")
+
+	fmt.Println("\n✅ Processamento concluído!")
+
+	// EXEMPLO 7: Workflow completo - seam carving + upscale para 1024x1024
+	fmt.Println("\n=== 7. Workflow completo: Ajusta para 1024x1024 ===")
+
+	// Carrega novamente
+	imgFile3, err := os.Open(inputImage)
+	if err != nil {
+		log.Fatalf("Erro: %v", err)
+	}
+	img3, _, err := image.Decode(imgFile3)
+	imgFile3.Close()
+	if err != nil {
+		log.Fatalf("Erro: %v", err)
+	}
+
+	// Ajusta aspect ratio para quadrado (1:1)
+	carver3 := seamcarver.NewSeamCarver(img3)
+	adjustedSquare, err := carver3.AdjustAspectRatio(seamcarver.AspectRatioOptions{
+		TargetRatio:     1.0, // quadrado
+		MaxDeltaBySeams: 300,
+	})
+	if err != nil {
+		log.Fatalf("Erro: %v", err)
+	}
+	carver3.SaveImage(adjustedSquare, "temp_adjusted_square.png")
+
+	// Upscale para 1024x1024
+	if err := ups.UpscaleWithOptions("temp_adjusted_square.png", "output_1024x1024.png", &upscaler.UpscaleOptions{
 		TargetWidth:     1024,
 		TargetHeight:    1024,
-		KeepAspectRatio: false, // Força dimensões exatas
-	})
+		KeepAspectRatio: false, // força quadrado
+	}); err != nil {
+		log.Printf("Erro: %v", err)
+	}
+
+	// Limpa arquivo temporário
+	os.Remove("temp_adjusted_square.png")
 
 	fmt.Println("\n✅ Processamento concluído!")
 }
