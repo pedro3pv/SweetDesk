@@ -6,7 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"runtime"
+	"path/filepath"
 )
 
 // App struct
@@ -16,6 +16,7 @@ type App struct {
 	upscaler       *services.Upscaler
 	pixabayKey     string
 	modelsFS       embed.FS
+	tempLibPath    string
 }
 
 // NewApp creates a new App application struct
@@ -32,14 +33,18 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize services
 	a.imageProcessor = services.NewImageProcessor(ctx)
 
-	// Determine ONNX runtime library path based on OS
-	onnxLibPath := a.getONNXLibPath()
+	// Extract and initialize ONNX library
+	onnxLibPath, err := a.extractONNXLibrary()
+	if err != nil {
+		fmt.Printf("Failed to extract ONNX library: %v\n", err)
+		return
+	}
+	a.tempLibPath = onnxLibPath
 
 	// Initialize upscaler with RealCUGAN by default
 	upscaler, err := services.NewUpscaler(ctx, services.RealCUGAN, a.modelsFS, onnxLibPath)
 	if err != nil {
 		fmt.Printf("Failed to initialize upscaler: %v\n", err)
-		// Continue without upscaler
 	} else {
 		a.upscaler = upscaler
 	}
@@ -48,18 +53,26 @@ func (a *App) startup(ctx context.Context) {
 	a.pixabayKey = os.Getenv("PIXABAY_API_KEY")
 }
 
-// getONNXLibPath returns the correct ONNX runtime library path for the current OS
-func (a *App) getONNXLibPath() string {
-	switch runtime.GOOS {
-	case "windows":
-		return "./onnxruntime.dll"
-	case "darwin":
-		return "./libonnxruntime.dylib"
-	case "linux":
-		return "./libonnxruntime.so"
-	default:
-		return "./libonnxruntime.so"
+// extractONNXLibrary extracts the embedded ONNX library to temp directory
+func (a *App) extractONNXLibrary() (string, error) {
+	// Get platform-specific library data (defined in app_*.go files)
+	libData, fileName := getONNXLibrary()
+
+	// Create temp directory
+	tempDir, err := os.MkdirTemp("", "sweetdesk-onnx-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
+
+	// Write library to temp file
+	libPath := filepath.Join(tempDir, fileName)
+	if err := os.WriteFile(libPath, libData, 0755); err != nil {
+		os.RemoveAll(tempDir)
+		return "", fmt.Errorf("failed to write library: %w", err)
+	}
+
+	fmt.Printf("✅ ONNX Runtime extracted to: %s\n", libPath)
+	return libPath, nil
 }
 
 // domReady is called after front-end resources have been loaded
@@ -69,10 +82,19 @@ func (a App) domReady(ctx context.Context) {
 
 // beforeClose is called when the application is about to quit
 func (a *App) beforeClose(ctx context.Context) (prevent bool) {
-	// Cleanup
+	// Cleanup upscaler
 	if a.upscaler != nil {
 		a.upscaler.Close()
 	}
+
+	// Clean up temp library file
+	if a.tempLibPath != "" {
+		tempDir := filepath.Dir(a.tempLibPath)
+		if err := os.RemoveAll(tempDir); err != nil {
+			fmt.Printf("Failed to cleanup temp dir: %v\n", err)
+		}
+	}
+
 	return false
 }
 
