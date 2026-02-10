@@ -112,47 +112,6 @@ Complete processing pipeline: classify, upscale, and adjust aspect ratio.
 const result = await window.go.main.App.ProcessImage(base64Data, "4K", true);
 ```
 
-#### `ProcessImageWithCustomResolution(base64Data string, targetWidth int, targetHeight int, aspectRatioW int, aspectRatioH int, useSeamCarving bool) (string, error)`
-
-Complete processing pipeline with custom resolution and aspect ratio support.
-
-**Parameters:**
-- `base64Data`: Base64-encoded input image data
-- `targetWidth`: Target width in pixels (0 to calculate from aspect ratio)
-- `targetHeight`: Target height in pixels (0 to calculate from aspect ratio)
-- `aspectRatioW`: Aspect ratio width component (e.g., 21 for 21:9, 0 for exact dimensions)
-- `aspectRatioH`: Aspect ratio height component (e.g., 9 for 21:9, 0 for exact dimensions)
-- `useSeamCarving`: Use content-aware resize (true) or simple scale/crop (false)
-
-**Returns:**
-- Base64-encoded processed image data
-- Error if processing fails
-
-**Processing Steps:**
-1. Classify image type (anime vs photo)
-2. Calculate target dimensions based on parameters
-3. Upscale using appropriate model if needed
-4. Adjust to exact dimensions using seam carving or simple scaling
-5. Return final result
-
-**Examples:**
-```javascript
-// Custom exact dimensions (2560x1440)
-const result = await window.go.main.App.ProcessImageWithCustomResolution(
-    base64Data, 2560, 1440, 0, 0, true
-);
-
-// Custom aspect ratio 21:9 with width of 3440
-const result = await window.go.main.App.ProcessImageWithCustomResolution(
-    base64Data, 3440, 0, 21, 9, true
-);
-
-// Custom aspect ratio 4:3 with height of 2160
-const result = await window.go.main.App.ProcessImageWithCustomResolution(
-    base64Data, 0, 2160, 4, 3, false
-);
-```
-
 ## Data Structures
 
 ### ImageResult
