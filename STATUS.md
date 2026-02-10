@@ -147,7 +147,7 @@
 
 ## 🎯 Next Steps
 
-### Immediate (v0.1.0)
+### Immediate (v0.0.1)
 1. Download actual AI binaries
 2. Test full processing pipeline
 3. Implement "Set as Wallpaper"

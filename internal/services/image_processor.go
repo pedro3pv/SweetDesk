@@ -24,14 +24,10 @@ func NewImageProcessor(ctx context.Context) *ImageProcessor {
 
 // ProcessingOptions contains options for image processing
 type ProcessingOptions struct {
-	TargetResolution string  // "4K", "5K", "8K", or "custom"
-	CustomWidth      int     // Custom target width (used when TargetResolution is "custom")
-	CustomHeight     int     // Custom target height (used when TargetResolution is "custom")
-	AspectRatio      string  // "16:9", "21:9", "4:3", "custom"
-	CustomAspectW    int     // Custom aspect ratio width (e.g., 21 for 21:9)
-	CustomAspectH    int     // Custom aspect ratio height (e.g., 9 for 21:9)
-	UseSeamCarving   bool    // true for content-aware, false for crop
-	Quality          int     // JPEG quality (1-100)
+	TargetResolution string // "4K", "5K", "8K"
+	AspectRatio      string // "16:9", "21:9", "auto"
+	UseSeamCarving   bool   // true for content-aware, false for crop
+	Quality          int    // JPEG quality (1-100)
 }
 
 // ProcessingResult contains the result of image processing
@@ -56,7 +52,7 @@ func (ip *ImageProcessor) LoadImageFromBytes(data []byte) (image.Image, string, 
 // EncodeImage encodes an image to bytes
 func (ip *ImageProcessor) EncodeImage(img image.Image, format string, quality int) ([]byte, error) {
 	var buf bytes.Buffer
-	
+
 	switch format {
 	case "jpeg", "jpg":
 		err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality})
@@ -71,7 +67,7 @@ func (ip *ImageProcessor) EncodeImage(img image.Image, format string, quality in
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
-	
+
 	return buf.Bytes(), nil
 }
 

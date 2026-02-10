@@ -43,7 +43,7 @@ If applicable, add screenshots.
 
 **Environment:**
  - OS: [e.g. macOS 14.0]
- - Version: [e.g. 0.1.0]
+ - Version: [e.g. 0.0.1]
  - Hardware: [e.g. M1 Mac, 16GB RAM]
 ```
 
@@ -289,7 +289,7 @@ def process_image(image_path: str) -> dict:
 3. Update version in `package.json` and `wails.json`
 4. Update CHANGELOG.md
 5. Merge `develop` to `main`
-6. Tag release: `git tag v0.1.0`
+6. Tag release: `git tag v0.0.1`
 7. Build and distribute
 
 ## Areas Needing Help
