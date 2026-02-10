@@ -35,3 +35,4 @@ pure-go-project/.tldrignore
 /pure-go-project/.claude
 /pure-go-project/caformer_s36_v1.3_fixed
 /pure-go-project/models
+/models
