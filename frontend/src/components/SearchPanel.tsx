@@ -112,7 +112,7 @@ export default function SearchPanel({ onImageSelect }: SearchPanelProps) {
             {/* Initial State */}
             {!query && (
                 <div className="text-center py-8 text-purple-600 dark:text-purple-400">
-                    <p className="text-sm mb-3">Try searching for:</p>
+                    <p className="text-sm mb-2 lg:mb-3">Try searching for:</p>
                     <div className="flex flex-wrap gap-2 mt-2 justify-center">
                         {['nature', 'mountains', 'ocean', 'city', 'space'].map((tag) => (
                             <button
