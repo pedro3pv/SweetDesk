@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-    /* Light Mode */
-    --background: #f9fafb;
-    --foreground: #111827;
+    /* Dark Mode by Default - Purple Dark Harmony */
+    --background: #1a1625;
+    --foreground: #f0f0f0;
     
     /* Purple Primary Colors */
     --purple-50: #f9f5ff;
@@ -40,19 +40,13 @@
     --text-2xl: 24px;
     --text-3xl: 30px;
     --text-4xl: 36px;
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        /* Dark Mode - Purple Dark Harmony */
-        --background: #1a1625;
-        --foreground: #f0f0f0;
-        --dark-bg: #1a1625;
-        --dark-surface: #2d1f3d;
-        --dark-border: #4a3361;
-        --dark-text: #f0f0f0;
-        --dark-text-secondary: #b4a7c6;
-    }
+    
+    /* Dark Mode Colors */
+    --dark-bg: #1a1625;
+    --dark-surface: #2d1f3d;
+    --dark-border: #4a3361;
+    --dark-text: #f0f0f0;
+    --dark-text-secondary: #b4a7c6;
 }
 
 @theme {
