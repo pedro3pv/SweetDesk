@@ -7,7 +7,7 @@
     "frontend:dev:watcher": "bun run dev",
     "frontend:dev:serverUrl": "auto",
     "preBuildHooks": {
-        "*/*": "./scripts/download_models.sh"
+        "*/*": "./scripts/download-models.sh"
     },
     "author": {
         "name": "pedro3pv",
