@@ -16,7 +16,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
     title: "SweetDesk - Wallpaper Processing",
-    description: "Busque, processe e salve wallpapers em alta resolucao com upscale AI",
+    description: "Busque, processe e salve wallpapers em alta resolução com upscale AI",
 };
 
 export const viewport: Viewport = {
