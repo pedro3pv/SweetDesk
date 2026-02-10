@@ -1,6 +1,6 @@
 'use client';
 
-import type { DownloadItem } from '@/lib/types';
+import type { DownloadItem } from '../lib/types';
 
 interface DownloadListProps {
     items: DownloadItem[];

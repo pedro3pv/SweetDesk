@@ -3,8 +3,8 @@
 import React from "react"
 
 import { useState, useCallback } from 'react';
-import type { ImageResult, FilterState } from '@/lib/types';
-import { SearchImages } from '@wailsjs/go/main/App';
+import type { ImageResult, FilterState } from '../lib/types';
+import { SearchImages } from '../../wailsjs/go/main/App';
 
 interface SearchPanelProps {
     onImageSelect: (image: ImageResult) => void;

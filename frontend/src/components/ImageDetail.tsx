@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { ImageResult, DownloadItem } from '@/lib/types';
+import type { ImageResult, DownloadItem } from '../lib/types';
 
 interface ImageDetailProps {
     image: ImageResult;

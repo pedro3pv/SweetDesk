@@ -1,7 +1,21 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { DownloadItem } from '@/lib/types';
+import type { DownloadItem } from '../lib/types';
+
+// Extend the Window interface to include 'go'
+declare global {
+    interface Window {
+        go?: {
+            main?: {
+                App?: {
+                    ProcessImage?: (base64Data: string, dimension: string, useSeamCarving: boolean) => Promise<void>;
+                    DownloadImage?: (url: string) => Promise<string>;
+                };
+            };
+        };
+    }
+}
 
 interface ProcessingViewProps {
     items: DownloadItem[];
@@ -19,6 +33,11 @@ export default function ProcessingView({ items, onComplete }: ProcessingViewProp
     const selectedItems = items.filter(i => i.selected);
 
     const processItems = useCallback(async () => {
+        if (selectedItems.length === 0) {
+            setProgress(100);
+            setStatus('complete');
+            return;
+        }
         for (let i = 0; i < selectedItems.length; i++) {
             const item = selectedItems[i];
             setCurrentItem(i);

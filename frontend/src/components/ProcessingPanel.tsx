@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ProcessImage } from '@wailsjs/go/main/App';
+import { ProcessImage } from '../../wailsjs/go/main/App';
 
 interface ProcessingPanelProps {
     imageData: string;

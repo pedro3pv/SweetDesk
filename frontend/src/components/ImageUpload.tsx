@@ -3,14 +3,13 @@
 import React from "react"
 
 import { useCallback, useState } from 'react';
-import type { ImageResult } from '@/lib/types';
+import type { ImageResult } from '../lib/types';
 
 interface ImageUploadProps {
     onImageSelect: (image: ImageResult) => void;
-    onAddToList: (image: ImageResult) => void;
 }
 
-export default function ImageUpload({ onImageSelect, onAddToList }: ImageUploadProps) {
+export default function ImageUpload({ onImageSelect }: ImageUploadProps) {
     const [isDragging, setIsDragging] = useState(false);
 
     const processFile = useCallback((file: File) => {
@@ -40,15 +39,19 @@ export default function ImageUpload({ onImageSelect, onAddToList }: ImageUploadP
     }, [onImageSelect]);
 
     const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) processFile(file);
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            Array.from(files).forEach(processFile);
+        }
     }, [processFile]);
-
+    
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file) processFile(file);
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            Array.from(files).forEach(processFile);
+        }
     }, [processFile]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {

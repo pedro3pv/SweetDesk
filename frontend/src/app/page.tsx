@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { ImageResult, DownloadItem, AppView } from '@/lib/types';
-import SearchPanel from '@/components/SearchPanel';
-import ImageUpload from '@/components/ImageUpload';
-import ImageDetail from '@/components/ImageDetail';
-import DownloadList from '@/components/DownloadList';
-import FolderSelect from '@/components/FolderSelect';
-import ProcessingView from '@/components/ProcessingView';
-import CompleteView from '@/components/CompleteView';
+import type { ImageResult, DownloadItem, AppView } from '../lib/types';
+import SearchPanel from '../components/SearchPanel';
+import ImageUpload from '../components/ImageUpload';
+import ImageDetail from '../components/ImageDetail';
+import DownloadList from '../components/DownloadList';
+import FolderSelect from '../components/FolderSelect';
+import ProcessingView from '../components/ProcessingView';
+import CompleteView from '../components/CompleteView';
 
 export default function Home() {
     const [view, setView] = useState<AppView>('search');
@@ -167,7 +167,6 @@ export default function Home() {
                         {view === 'upload' && (
                             <ImageUpload
                                 onImageSelect={handleImageSelect}
-                                onAddToList={handleQuickAdd}
                             />
                         )}
                         {view === 'image-detail' && selectedImage && (
@@ -200,9 +199,7 @@ export default function Home() {
                         {view === 'processing' && (
                             <ProcessingView
                                 items={downloadItems}
-                                savePath={savePath}
                                 onComplete={handleProcessComplete}
-                                onCancel={() => setView('download-list')}
                             />
                         )}
                     </div>
