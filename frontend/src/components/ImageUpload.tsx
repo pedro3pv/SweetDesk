@@ -44,7 +44,7 @@ export default function ImageUpload({ onImageSelect }: ImageUploadProps) {
             <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
-                className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer"
+                className="border-2 border-dashed border-purple-300 dark:border-dark-border rounded-xl p-6 lg:p-8 text-center hover:border-purple-500 dark:hover:border-purple-600 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-all cursor-pointer"
             >
                 <input
                     type="file"
@@ -56,17 +56,17 @@ export default function ImageUpload({ onImageSelect }: ImageUploadProps) {
                 <label htmlFor="file-upload" className="cursor-pointer">
                     <div className="space-y-2">
                         <div className="text-4xl">📁</div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-purple-700 dark:text-purple-300">
                             Drop an image here or click to browse
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                        <p className="text-xs text-purple-500 dark:text-purple-400">
                             Supports: JPG, PNG, WebP
                         </p>
                     </div>
                 </label>
             </div>
 
-            <div className="text-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="text-center text-xs lg:text-sm text-purple-600 dark:text-purple-400">
                 <p>Maximum file size: 10MB</p>
             </div>
         </div>
