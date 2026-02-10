@@ -24,12 +24,8 @@ func NewImageProcessor(ctx context.Context) *ImageProcessor {
 
 // ProcessingOptions contains options for image processing
 type ProcessingOptions struct {
-	TargetResolution string  // "4K", "5K", "8K", or "custom"
-	CustomWidth      int     // Custom target width (used when TargetResolution is "custom")
-	CustomHeight     int     // Custom target height (used when TargetResolution is "custom")
-	AspectRatio      string  // "16:9", "21:9", "4:3", "custom"
-	CustomAspectW    int     // Custom aspect ratio width (e.g., 21 for 21:9)
-	CustomAspectH    int     // Custom aspect ratio height (e.g., 9 for 21:9)
+	TargetResolution string  // "4K", "5K", "8K"
+	AspectRatio      string  // "16:9", "21:9", "auto"
 	UseSeamCarving   bool    // true for content-aware, false for crop
 	Quality          int     // JPEG quality (1-100)
 }
