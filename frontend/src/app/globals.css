@@ -1,52 +1,15 @@
 @import "tailwindcss";
 
 :root {
-    /* Dark Mode by Default - Purple Dark Harmony */
-    --background: #1a1625;
-    --foreground: #f0f0f0;
-    
-    /* Purple Primary Colors */
-    --purple-50: #f9f5ff;
-    --purple-100: #f3e8ff;
-    --purple-200: #e9d5ff;
-    --purple-300: #d8b4fe;
-    --purple-400: #c084fc;
-    --purple-500: #a855f7;
-    --purple-600: #9333ea;
-    --purple-700: #7e22ce;
-    --purple-800: #6b21a8;
-    --purple-900: #581c87;
-    --purple-950: #3f0f5c;
-    
-    /* Accent Colors */
-    --amber-400: #fbbf24;
-    --amber-500: #f59e0b;
-    --cyan-400: #22d3ee;
-    --cyan-500: #06b6d4;
-    
-    /* Status Colors */
-    --success: #10b981;
-    --warning: #f59e0b;
-    --error: #ef4444;
-    --info: #06b6d4;
-    
-    /* Typography */
-    --text-xs: 11px;
-    --text-sm: 13px;
-    --text-base: 14px;
-    --text-md: 16px;
-    --text-lg: 18px;
-    --text-xl: 20px;
-    --text-2xl: 24px;
-    --text-3xl: 30px;
-    --text-4xl: 36px;
-    
-    /* Dark Mode Colors */
-    --dark-bg: #1a1625;
-    --dark-surface: #2d1f3d;
-    --dark-border: #4a3361;
-    --dark-text: #f0f0f0;
-    --dark-text-secondary: #b4a7c6;
+    --background: #ffffff;
+    --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #0a0a0a;
+        --foreground: #ededed;
+    }
 }
 
 @theme {
@@ -57,19 +20,5 @@
 body {
     color: var(--foreground);
     background: var(--background);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-        sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-/* Smooth transitions for interactive elements */
-button,
-input,
-select,
-textarea,
-a,
-.transition {
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+    font-family: Arial, Helvetica, sans-serif;
 }
