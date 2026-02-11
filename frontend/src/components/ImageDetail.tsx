@@ -16,15 +16,56 @@ export default function ImageDetail({ image, onBack, onAddToList }: ImageDetailP
     const [upscale, setUpscale] = useState(true);
     const [dimension, setDimension] = useState('3840x2160');
     const [aspect, setAspect] = useState('16:9');
+    const [customDimension, setCustomDimension] = useState('');
+    const [customAspect, setCustomAspect] = useState('');
+    const [showCustomDimension, setShowCustomDimension] = useState(false);
+    const [showCustomAspect, setShowCustomAspect] = useState(false);
+
+    const effectiveDimension = showCustomDimension ? customDimension : dimension;
+    const effectiveAspect = showCustomAspect ? customAspect : aspect;
 
     const handleAdd = () => {
+        // Validate custom values before adding
+        if (showCustomDimension) {
+            const match = /^(\d+)x(\d+)$/.exec(customDimension);
+            if (!match) return;
+            const width = Number(match[1]);
+            const height = Number(match[2]);
+            if (
+                !Number.isFinite(width) ||
+                !Number.isFinite(height) ||
+                width < 1 ||
+                width > 16384 ||
+                height < 1 ||
+                height > 16384
+            ) {
+                return;
+            }
+        }
+        if (showCustomAspect) {
+            const match = /^(\d+):(\d+)$/.exec(customAspect);
+            if (!match) return;
+            const num = Number(match[1]);
+            const den = Number(match[2]);
+            if (
+                !Number.isFinite(num) ||
+                !Number.isFinite(den) ||
+                num < 1 ||
+                num > 16384 ||
+                den < 1 ||
+                den > 16384
+            ) {
+                return;
+            }
+        }
+
         const item: DownloadItem = {
             id: `dl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             image,
             name: image.description || `wallpaper-${image.id}`,
             upscale,
-            dimension,
-            aspect,
+            dimension: effectiveDimension,
+            aspect: effectiveAspect,
             selected: true,
         };
         onAddToList(item);
@@ -111,9 +152,9 @@ export default function ImageDetail({ image, onBack, onAddToList }: ImageDetailP
                         {DIMENSIONS.map(d => (
                             <button
                                 key={d}
-                                onClick={() => setDimension(d)}
+                                onClick={() => { setDimension(d); setShowCustomDimension(false); }}
                                 className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
-                                    dimension === d
+                                    !showCustomDimension && dimension === d
                                         ? 'bg-primary text-primary-foreground border-primary'
                                         : 'bg-secondary text-secondary-foreground border-border hover:border-muted-foreground'
                                 }`}
@@ -121,7 +162,26 @@ export default function ImageDetail({ image, onBack, onAddToList }: ImageDetailP
                                 {d}
                             </button>
                         ))}
+                        <button
+                            onClick={() => setShowCustomDimension(true)}
+                            className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+                                showCustomDimension
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-secondary text-secondary-foreground border-border hover:border-muted-foreground'
+                            }`}
+                        >
+                            Personalizado
+                        </button>
                     </div>
+                    {showCustomDimension && (
+                        <input
+                            type="text"
+                            value={customDimension}
+                            onChange={(e) => setCustomDimension(e.target.value)}
+                            placeholder="Ex: 2560x1600"
+                            className="mt-2 w-full px-3 py-2 bg-input border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                    )}
                 </div>
 
                 {/* Aspect selection */}
@@ -131,9 +191,9 @@ export default function ImageDetail({ image, onBack, onAddToList }: ImageDetailP
                         {ASPECTS.map(a => (
                             <button
                                 key={a}
-                                onClick={() => setAspect(a)}
+                                onClick={() => { setAspect(a); setShowCustomAspect(false); }}
                                 className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
-                                    aspect === a
+                                    !showCustomAspect && aspect === a
                                         ? 'bg-primary text-primary-foreground border-primary'
                                         : 'bg-secondary text-secondary-foreground border-border hover:border-muted-foreground'
                                 }`}
@@ -141,7 +201,26 @@ export default function ImageDetail({ image, onBack, onAddToList }: ImageDetailP
                                 {a}
                             </button>
                         ))}
+                        <button
+                            onClick={() => setShowCustomAspect(true)}
+                            className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+                                showCustomAspect
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-secondary text-secondary-foreground border-border hover:border-muted-foreground'
+                            }`}
+                        >
+                            Personalizado
+                        </button>
                     </div>
+                    {showCustomAspect && (
+                        <input
+                            type="text"
+                            value={customAspect}
+                            onChange={(e) => setCustomAspect(e.target.value)}
+                            placeholder="Ex: 32:9"
+                            className="mt-2 w-full px-3 py-2 bg-input border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                    )}
                 </div>
 
                 {/* Add to list button */}

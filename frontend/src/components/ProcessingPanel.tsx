@@ -21,7 +21,6 @@ export default function ProcessingPanel({
     onProcessError,
 }: ProcessingPanelProps) {
     const [targetResolution, setTargetResolution] = useState('4K');
-    const [useSeamCarving, setUseSeamCarving] = useState(false);
     const [progress, setProgress] = useState<string>('');
 
     const handleProcess = async () => {
@@ -38,10 +37,22 @@ export default function ProcessingPanel({
             setProgress('🚀 Processing to ' + targetResolution + '...');
             await new Promise(resolve => setTimeout(resolve, 300));
 
+            // Map resolution names to width/height
+            let targetWidth = 3840;
+            let targetHeight = 2160;
+            switch (targetResolution) {
+                case '4K': targetWidth = 3840; targetHeight = 2160; break;
+                case '5K': targetWidth = 5120; targetHeight = 2880; break;
+                case '8K': targetWidth = 7680; targetHeight = 4320; break;
+            }
+
             // Full processing (classification + upscale + adjustments in backend)
             const result = await ProcessImage(
                 imageData,
-                targetResolution
+                targetWidth,
+                targetHeight,
+                '',
+                ''
             );
 
             setProgress('✅ Processing complete!');
@@ -78,7 +89,7 @@ export default function ProcessingPanel({
                             onClick={() => setTargetResolution(res)}
                             className={`py-2 px-3 lg:px-4 rounded-lg text-sm lg:text-base font-medium transition-all transform ${
                                 targetResolution === res
-                                    ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg scale-105'
+                                    ? 'bg-linear-to-r from-purple-500 to-indigo-600 text-white shadow-lg scale-105'
                                     : 'bg-purple-100 dark:bg-dark-surface text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/30 hover:scale-105'
                             }`}
                         >
@@ -93,38 +104,20 @@ export default function ProcessingPanel({
                 </p>
             </div>
 
-            {/* Aspect Ratio Method */}
-            <div className="mb-4">
-                <label className="flex items-center space-x-2 cursor-pointer group">
-                    <input
-                        type="checkbox"
-                        checked={useSeamCarving}
-                        onChange={(e) => setUseSeamCarving(e.target.checked)}
-                        className="w-4 h-4 text-purple-500 rounded focus:ring-purple-500 border-purple-300 dark:border-purple-600"
-                    />
-                    <span className="text-xs lg:text-sm text-purple-800 dark:text-purple-300 group-hover:text-purple-600 dark:group-hover:text-purple-200 transition-colors">
-                        Use Content-Aware Resize (Seam Carving)
-                    </span>
-                </label>
-                <p className="mt-1 text-xs text-purple-600 dark:text-purple-400 ml-6">
-                    {useSeamCarving
-                        ? 'Intelligently preserves important content (slower)'
-                        : 'Fast center crop to target aspect ratio'}
-                </p>
-            </div>
+            {/* ...existing code... */}
 
             {/* Process Button */}
             <button
                 onClick={handleProcess}
                 disabled={isProcessing || !imageData}
-                className="w-full py-2.5 lg:py-3 bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600 text-white rounded-lg text-sm lg:text-base font-semibold hover:from-purple-600 hover:via-indigo-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:transform-none shadow-lg hover:shadow-xl"
+                className="w-full py-2.5 lg:py-3 bg-linear-to-r from-purple-500 via-indigo-500 to-purple-600 text-white rounded-lg text-sm lg:text-base font-semibold hover:from-purple-600 hover:via-indigo-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:transform-none shadow-lg hover:shadow-xl"
             >
                 {isProcessing ? '⏳ Processing...' : '🚀 Process Image'}
             </button>
 
             {/* Progress Display */}
             {progress && (
-                <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="mt-4 p-3 bg-linear-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                     <p className="text-xs lg:text-sm text-purple-700 dark:text-purple-300 text-center font-medium">
                         {progress}
                     </p>

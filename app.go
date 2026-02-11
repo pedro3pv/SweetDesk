@@ -127,47 +127,67 @@ func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (stri
 }
 
 // ProcessImage is the main processing pipeline
-func (a *App) ProcessImage(base64Data string, targetResolution string) (string, error) {
+func (a *App) ProcessImage(base64Data string, targetWidth int, targetHeight int, savePath string, fileName string) (string, error) {
 	if a.upscaler == nil {
 		return "", fmt.Errorf("upscaler not initialized")
 	}
 
-	// 1. Decode image
+	// 1. Early validation of dimensions (before decoding Base64)
+	if targetWidth <= 0 || targetHeight <= 0 {
+		return "", fmt.Errorf("invalid target resolution: %dx%d (dimensions must be positive)", targetWidth, targetHeight)
+	}
+
+	// 2. Configurable maxResolution via UpscaleOptions
+	const defaultMaxResolution = 16384
+	maxResolution := defaultMaxResolution
+
+	// Prepare options with possible MaxResolution override
+	options := &services.UpscaleOptions{
+		TargetWidth:     targetWidth,
+		TargetHeight:    targetHeight,
+		KeepAspectRatio: false,
+		Format:          "png",
+	}
+	if options.MaxResolution > 0 && options.MaxResolution < defaultMaxResolution {
+		maxResolution = options.MaxResolution
+	}
+
+	// 3. Per-dimension and total pixel checks (before decode)
+	if targetWidth > maxResolution || targetHeight > maxResolution {
+		return "", fmt.Errorf("target resolution %dx%d exceeds maximum allowed dimensions of %dx%d",
+			targetWidth, targetHeight, maxResolution, maxResolution)
+	}
+
+	maxPixels := int64(maxResolution) * int64(maxResolution)
+	totalPixels := int64(targetWidth) * int64(targetHeight)
+	if totalPixels > maxPixels {
+		estBytes := totalPixels * 4
+		estMB := float64(estBytes) / (1024 * 1024)
+		estGB := estMB / 1024
+		return "", fmt.Errorf("target resolution %dx%d (%d megapixels) exceeds maximum pixel count (%.1f megapixels). Estimated RGBA buffer: %.1f MB (%.2f GB)",
+			targetWidth, targetHeight, totalPixels/1_000_000, float64(maxPixels)/1_000_000, estMB, estGB)
+	}
+
+	// 4. Decode image (after validation)
 	data, err := a.imageProcessor.ConvertFromBase64(base64Data)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
 
-	// 2. Determine scale and options based on target resolution
-	var options *services.UpscaleOptions
-	switch targetResolution {
-	case "4K", "3840x2160":
-		options = &services.UpscaleOptions{
-			TargetWidth:     3840,
-			TargetHeight:    2160,
-			KeepAspectRatio: true,
-			Format:          "png",
-		}
-	case "1080p", "1920x1080":
-		options = &services.UpscaleOptions{
-			TargetWidth:     1920,
-			TargetHeight:    1080,
-			KeepAspectRatio: true,
-			Format:          "png",
-		}
-	default:
-		options = &services.UpscaleOptions{
-			ScaleFactor: 4.0,
-			Format:      "png",
-		}
-	}
-
-	// 3. Upscale image
+	// 5. Upscale image
 	upscaled, err := a.upscaler.UpscaleBytes(data, options)
 	if err != nil {
 		return "", fmt.Errorf("failed to upscale: %w", err)
 	}
 
-	// 4. Return result as base64
+	// 6. Save to file if savePath is provided
+	if savePath != "" && fileName != "" {
+		_, err := a.imageProcessor.SaveToFile(upscaled, savePath, fileName)
+		if err != nil {
+			return "", fmt.Errorf("failed to save image: %w", err)
+		}
+	}
+
+	// 7. Return result as base64
 	return a.imageProcessor.ConvertToBase64(upscaled), nil
 }

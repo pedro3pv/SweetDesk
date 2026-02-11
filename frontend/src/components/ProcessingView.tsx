@@ -9,7 +9,7 @@ declare global {
         go?: {
             main?: {
                 App?: {
-                    ProcessImage?: (base64Data: string, dimension: string, useSeamCarving: boolean) => Promise<void>;
+                    ProcessImage?: (base64Data: string, targetWidth: number, targetHeight: number, savePath: string, fileName: string) => Promise<string>;
                     DownloadImage?: (url: string) => Promise<string>;
                 };
             };
@@ -19,10 +19,11 @@ declare global {
 
 interface ProcessingViewProps {
     items: DownloadItem[];
+    savePath: string;
     onComplete: () => void;
 }
 
-export default function ProcessingView({ items, onComplete }: ProcessingViewProps) {
+export default function ProcessingView({ items, savePath, onComplete }: ProcessingViewProps) {
     const [progress, setProgress] = useState(0);
     const [currentItem, setCurrentItem] = useState(0);
     const [status, setStatus] = useState<'processing' | 'complete' | 'error'>('processing');
@@ -31,6 +32,39 @@ export default function ProcessingView({ items, onComplete }: ProcessingViewProp
     );
 
     const selectedItems = items.filter(i => i.selected);
+
+    // Helper: sanitize filename to avoid path traversal and invalid chars
+    function sanitizeFilename(input: string, defaultExt: string = '.png'): string {
+        // Strip any path components and get basename only
+        let name = input.replace(/^.*[\/]/, '');
+
+        // Remove dangerous characters: <>:"/\|?* and control chars (0x00-0x1F)
+        name = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+
+        // Remove leading/trailing dots and spaces
+        name = name.replace(/^[.\s]+|[.\s]+$/g, '');
+
+        // Handle Windows reserved names
+        const reservedNames = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+        if (reservedNames.test(name.split('.')[0])) {
+            name = '_' + name;
+        }
+
+        // Check for extension
+        const hasExtension = /\.[a-zA-Z0-9]{1,6}$/.test(name);
+        if (!hasExtension) {
+            name += defaultExt;
+        }
+
+        // Enforce 255-char limit
+        if (name.length > 255) {
+            const ext = name.match(/\.[^.]+$/)?.[0] || '';
+            const base = name.slice(0, 255 - ext.length);
+            name = base + ext;
+        }
+
+        return name || `wallpaper_${Date.now()}${defaultExt}`;
+    }
 
     const processItems = useCallback(async () => {
         if (selectedItems.length === 0) {
@@ -58,9 +92,14 @@ export default function ProcessingView({ items, onComplete }: ProcessingViewProp
                     }
 
                     if (base64Data) {
-                        const useSeamCarving = false;
+                        // Parse dimension string "WIDTHxHEIGHT" into numbers
+                        const parts = item.dimension.split('x');
+                        const targetWidth = parseInt(parts[0], 10) || 3840;
+                        const targetHeight = parseInt(parts[1], 10) || 2160;
+                        const fileName = sanitizeFilename(item.name || `wallpaper-${item.id}`, '.png');
+
                         // @ts-ignore
-                        await window.go.main.App.ProcessImage(base64Data, item.dimension, useSeamCarving);
+                        await window.go.main.App.ProcessImage(base64Data, targetWidth, targetHeight, savePath, fileName);
                     } else {
                         // Fallback: simulate processing if we cannot obtain base64 data
                         await new Promise(r => setTimeout(r, 800 + Math.random() * 1200));
@@ -78,7 +117,7 @@ export default function ProcessingView({ items, onComplete }: ProcessingViewProp
             setProgress(Math.round(((i + 1) / selectedItems.length) * 100));
         }
         setStatus('complete');
-    }, [selectedItems]);
+    }, [selectedItems, savePath]);
 
     useEffect(() => {
         processItems();
