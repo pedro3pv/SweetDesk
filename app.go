@@ -127,13 +127,33 @@ func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (stri
 }
 
 // ProcessImage is the main processing pipeline
+// ProcessImage is the main processing pipeline
 func (a *App) ProcessImage(base64Data string, targetWidth int, targetHeight int, savePath string, fileName string) (string, error) {
 	if a.upscaler == nil {
 		return "", fmt.Errorf("upscaler not initialized")
 	}
 
+	// Define maximum resolution limit (matching UI and common GPU texture limits)
+	const maxResolution = 16384
+
+	// Validate dimensions
 	if targetWidth <= 0 || targetHeight <= 0 {
-		return "", fmt.Errorf("invalid target resolution: %dx%d", targetWidth, targetHeight)
+		return "", fmt.Errorf("invalid target resolution: %dx%d (dimensions must be positive)", targetWidth, targetHeight)
+	}
+
+	// Add upper bound check to prevent OOM from excessive buffer allocation
+	if targetWidth > maxResolution || targetHeight > maxResolution {
+		return "", fmt.Errorf("target resolution %dx%d exceeds maximum allowed dimensions of %dx%d",
+			targetWidth, targetHeight, maxResolution, maxResolution)
+	}
+
+	// Optional: Check total pixel count to prevent extreme aspect ratios
+	// RGBA buffer size = width * height * 4 bytes
+	maxPixels := int64(maxResolution) * int64(maxResolution)
+	totalPixels := int64(targetWidth) * int64(targetHeight)
+	if totalPixels > maxPixels {
+		return "", fmt.Errorf("target resolution %dx%d (%d megapixels) exceeds maximum pixel count (%.1f megapixels)",
+			targetWidth, targetHeight, totalPixels/1_000_000, float64(maxPixels)/1_000_000)
 	}
 
 	// 1. Decode image
