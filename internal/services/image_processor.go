@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings" // ADDED: Required for containsSeparator
 )
 
 // ImageProcessor handles all image processing operations
@@ -90,13 +91,21 @@ func (ip *ImageProcessor) SaveToFile(data []byte, savePath string, fileName stri
 		return "", fmt.Errorf("save path cannot be empty")
 	}
 
-	// Expand ~ to home directory
+	// Expand ~ or ~/ (and ~\ on Windows) to home directory
 	if len(savePath) > 0 && savePath[0] == '~' {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", fmt.Errorf("failed to resolve home directory: %w", err)
 		}
-		savePath = filepath.Join(home, savePath[1:])
+		// Only ~ or ~/ or ~\
+		if savePath == "~" {
+			savePath = home
+		} else if len(savePath) > 1 && (savePath[1] == '/' || savePath[1] == '\\') {
+			// Trim the separator: ~/Pictures becomes "Pictures"
+			rel := savePath[2:]
+			savePath = filepath.Join(home, rel)
+		}
+		// If path is like ~username, do not expand (leave as is)
 	}
 
 	// Ensure directory exists
@@ -104,13 +113,36 @@ func (ip *ImageProcessor) SaveToFile(data []byte, savePath string, fileName stri
 		return "", fmt.Errorf("failed to create directory %s: %w", savePath, err)
 	}
 
-	// Determine format from extension or default to png
-	ext := filepath.Ext(fileName)
-	if ext == "" {
-		fileName += ".png"
+	// Sanitize fileName: extract only the base name
+	safeName := filepath.Base(filepath.Clean(fileName))
+
+	// Reject invalid filenames
+	if safeName == "." || safeName == ".." || safeName == "" || safeName == string(filepath.Separator) {
+		return "", fmt.Errorf("invalid filename: %s", fileName)
 	}
 
-	fullPath := filepath.Join(savePath, fileName)
+	// Reject any remaining path separators (defense in depth)
+	if containsSeparator(safeName) {
+		return "", fmt.Errorf("filename contains path separators: %s", fileName)
+	}
+
+	// Reject Windows drive letters (e.g., C:image.png)
+	if len(safeName) >= 2 && safeName[1] == ':' {
+		return "", fmt.Errorf("filename contains drive letter: %s", fileName)
+	}
+
+	// Check for Windows reserved names
+	if isWindowsReserved(safeName) {
+		return "", fmt.Errorf("filename uses Windows reserved name: %s", fileName)
+	}
+
+	// Add default extension if missing
+	ext := filepath.Ext(safeName)
+	if ext == "" {
+		safeName += ".png"
+	}
+
+	fullPath := filepath.Join(savePath, safeName)
 
 	if err := os.WriteFile(fullPath, data, 0644); err != nil {
 		return "", fmt.Errorf("failed to write file %s: %w", fullPath, err)
@@ -118,4 +150,30 @@ func (ip *ImageProcessor) SaveToFile(data []byte, savePath string, fileName stri
 
 	log.Printf("✅ Image saved: %s", fullPath)
 	return fullPath, nil
+}
+
+// containsSeparator checks if a string contains any path separator
+func containsSeparator(name string) bool {
+	return strings.Contains(name, "/") || strings.Contains(name, "\\")
+}
+
+// isWindowsReserved checks if filename uses a Windows reserved name
+func isWindowsReserved(name string) bool {
+	// Remove extension to check base name
+	baseName := strings.TrimSuffix(name, filepath.Ext(name))
+	baseName = strings.ToUpper(baseName)
+
+	// Windows reserved device names
+	reserved := []string{
+		"CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+	}
+
+	for _, r := range reserved {
+		if baseName == r {
+			return true
+		}
+	}
+	return false
 }
