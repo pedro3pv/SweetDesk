@@ -43,6 +43,15 @@ export default function DownloadList({
             const [w, h] = value.split('x').map(Number);
             if (w >= 1 && h >= 1 && w <= 16384 && h <= 16384) {
                 onUpdateItem(id, { dimension: value });
+
+                // Auto-clear custom state if value matches a preset
+                if (DIMENSIONS.slice(0, -1).includes(value)) {
+                    setCustomDimensions(prev => {
+                        const n = { ...prev };
+                        delete n[id];
+                        return n;
+                    });
+                }
             }
         }
     };
@@ -63,6 +72,15 @@ export default function DownloadList({
             const [w, h] = value.split(':').map(Number);
             if (w >= 1 && h >= 1) {
                 onUpdateItem(id, { aspect: value });
+
+                // Auto-clear custom state if value matches a preset
+                if (ASPECTS.slice(0, -1).includes(value)) {
+                    setCustomAspects(prev => {
+                        const n = { ...prev };
+                        delete n[id];
+                        return n;
+                    });
+                }
             }
         }
     };
@@ -136,13 +154,23 @@ export default function DownloadList({
 
                                 {/* Dimension select */}
                                 {isCustomDimension(item) ? (
-                                    <input
-                                        type="text"
-                                        value={customDimensions[item.id] ?? item.dimension}
-                                        onChange={(e) => handleCustomDimension(item.id, e.target.value)}
-                                        placeholder="WxH"
-                                        className="w-20 text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
-                                    />
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="text"
+                                            value={customDimensions[item.id] ?? item.dimension}
+                                            onChange={(e) => handleCustomDimension(item.id, e.target.value)}
+                                            placeholder="WxH"
+                                            className="w-20 text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+                                        />
+                                        <button
+                                            onClick={() => handleDimensionChange(item.id, DIMENSIONS[0])}
+                                            className="text-[10px] text-muted-foreground hover:text-foreground p-1"
+                                            title="Voltar para predefinições"
+                                            aria-label="Voltar para predefinições"
+                                        >
+                                            ↩
+                                        </button>
+                                    </div>
                                 ) : (
                                     <select
                                         value={item.dimension}
@@ -157,13 +185,23 @@ export default function DownloadList({
 
                                 {/* Aspect select */}
                                 {isCustomAspect(item) ? (
-                                    <input
-                                        type="text"
-                                        value={customAspects[item.id] ?? item.aspect}
-                                        onChange={(e) => handleCustomAspect(item.id, e.target.value)}
-                                        placeholder="W:H"
-                                        className="w-14 text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
-                                    />
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="text"
+                                            value={customAspects[item.id] ?? item.aspect}
+                                            onChange={(e) => handleCustomAspect(item.id, e.target.value)}
+                                            placeholder="W:H"
+                                            className="w-14 text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+                                        />
+                                        <button
+                                            onClick={() => handleAspectChange(item.id, ASPECTS[0])}
+                                            className="text-[10px] text-muted-foreground hover:text-foreground p-1"
+                                            title="Voltar para predefinições"
+                                            aria-label="Voltar para predefinições"
+                                        >
+                                            ↩
+                                        </button>
+                                    </div>
                                 ) : (
                                     <select
                                         value={item.aspect}
