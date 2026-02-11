@@ -21,7 +21,6 @@ export default function ProcessingPanel({
     onProcessError,
 }: ProcessingPanelProps) {
     const [targetResolution, setTargetResolution] = useState('4K');
-    // const [useSeamCarving, setUseSeamCarving] = useState(false); // Removido pois não está mais em uso
     const [progress, setProgress] = useState<string>('');
 
     const handleProcess = async () => {
