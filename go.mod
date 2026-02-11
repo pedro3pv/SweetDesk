@@ -2,7 +2,10 @@ module SweetDesk
 
 go 1.24.0
 
-require github.com/wailsapp/wails/v2 v2.11.0
+require (
+	github.com/owulveryck/onnx-go v0.5.0
+	github.com/wailsapp/wails/v2 v2.11.0
+)
 
 require (
 	github.com/apache/arrow/go/arrow v0.0.0-20201229220542-30ce2eb5d4dc // indirect
@@ -13,7 +16,6 @@ require (
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/google/flatbuffers v1.12.0 // indirect
 	github.com/leesper/go_rng v0.0.0-20190531154944-a612b043e353 // indirect
-	github.com/owulveryck/onnx-go v0.5.0 // indirect
 	github.com/xtgo/set v1.0.0 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
@@ -50,7 +52,6 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
-	github.com/yalue/onnxruntime_go v1.25.0
 	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/image v0.36.0
 	golang.org/x/net v0.35.0 // indirect
