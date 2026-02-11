@@ -41,8 +41,7 @@ export default function ProcessingPanel({
             // Full processing (classification + upscale + adjustments in backend)
             const result = await ProcessImage(
                 imageData,
-                targetResolution,
-                useSeamCarving
+                targetResolution
             );
 
             setProgress('✅ Processing complete!');
