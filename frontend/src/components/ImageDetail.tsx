@@ -25,6 +25,10 @@ export default function ImageDetail({ image, onBack, onAddToList }: ImageDetailP
     const effectiveAspect = showCustomAspect ? customAspect : aspect;
 
     const handleAdd = () => {
+        // Validate custom values before adding
+        if (showCustomDimension && !/^\d+x\d+$/.test(customDimension)) return;
+        if (showCustomAspect && !/^\d+:\d+$/.test(customAspect)) return;
+
         const item: DownloadItem = {
             id: `dl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             image,

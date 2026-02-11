@@ -48,8 +48,6 @@ func TestSaveToFile(t *testing.T) {
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			t.Errorf("file was not created at %s", fullPath)
 		}
-
-		_ = fullPath
 	})
 
 	t.Run("adds .png extension when missing", func(t *testing.T) {

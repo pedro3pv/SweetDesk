@@ -38,9 +38,12 @@ export default function DownloadList({
 
     const handleCustomDimension = (id: string, value: string) => {
         setCustomDimensions(prev => ({ ...prev, [id]: value }));
-        // Validate format WxH
+        // Validate format WxH with reasonable bounds
         if (/^\d+x\d+$/.test(value)) {
-            onUpdateItem(id, { dimension: value });
+            const [w, h] = value.split('x').map(Number);
+            if (w >= 1 && h >= 1 && w <= 16384 && h <= 16384) {
+                onUpdateItem(id, { dimension: value });
+            }
         }
     };
 
@@ -55,9 +58,12 @@ export default function DownloadList({
 
     const handleCustomAspect = (id: string, value: string) => {
         setCustomAspects(prev => ({ ...prev, [id]: value }));
-        // Validate format W:H
+        // Validate format W:H with reasonable bounds
         if (/^\d+:\d+$/.test(value)) {
-            onUpdateItem(id, { aspect: value });
+            const [w, h] = value.split(':').map(Number);
+            if (w >= 1 && h >= 1) {
+                onUpdateItem(id, { aspect: value });
+            }
         }
     };
 
