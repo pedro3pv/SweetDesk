@@ -26,8 +26,38 @@ export default function ImageDetail({ image, onBack, onAddToList }: ImageDetailP
 
     const handleAdd = () => {
         // Validate custom values before adding
-        if (showCustomDimension && !/^\d+x\d+$/.test(customDimension)) return;
-        if (showCustomAspect && !/^\d+:\d+$/.test(customAspect)) return;
+        if (showCustomDimension) {
+            const match = /^(\d+)x(\d+)$/.exec(customDimension);
+            if (!match) return;
+            const width = Number(match[1]);
+            const height = Number(match[2]);
+            if (
+                !Number.isFinite(width) ||
+                !Number.isFinite(height) ||
+                width < 1 ||
+                width > 16384 ||
+                height < 1 ||
+                height > 16384
+            ) {
+                return;
+            }
+        }
+        if (showCustomAspect) {
+            const match = /^(\d+):(\d+)$/.exec(customAspect);
+            if (!match) return;
+            const num = Number(match[1]);
+            const den = Number(match[2]);
+            if (
+                !Number.isFinite(num) ||
+                !Number.isFinite(den) ||
+                num < 1 ||
+                num > 16384 ||
+                den < 1 ||
+                den > 16384
+            ) {
+                return;
+            }
+        }
 
         const item: DownloadItem = {
             id: `dl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
