@@ -38,11 +38,22 @@ export default function ProcessingPanel({
             setProgress('🚀 Processing to ' + targetResolution + '...');
             await new Promise(resolve => setTimeout(resolve, 300));
 
+            // Map resolution names to width/height
+            let targetWidth = 3840;
+            let targetHeight = 2160;
+            switch (targetResolution) {
+                case '4K': targetWidth = 3840; targetHeight = 2160; break;
+                case '5K': targetWidth = 5120; targetHeight = 2880; break;
+                case '8K': targetWidth = 7680; targetHeight = 4320; break;
+            }
+
             // Full processing (classification + upscale + adjustments in backend)
             const result = await ProcessImage(
                 imageData,
-                targetResolution,
-                useSeamCarving
+                targetWidth,
+                targetHeight,
+                '',
+                ''
             );
 
             setProgress('✅ Processing complete!');

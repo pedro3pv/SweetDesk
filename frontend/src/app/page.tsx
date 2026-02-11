@@ -199,6 +199,7 @@ export default function Home() {
                         {view === 'processing' && (
                             <ProcessingView
                                 items={downloadItems}
+                                savePath={savePath}
                                 onComplete={handleProcessComplete}
                             />
                         )}

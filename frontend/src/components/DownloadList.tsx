@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { DownloadItem } from '../lib/types';
 
 interface DownloadListProps {
@@ -11,8 +12,8 @@ interface DownloadListProps {
     processing?: boolean;
 }
 
-const DIMENSIONS = ['1920x1080', '2560x1440', '3840x2160', '5120x2880'];
-const ASPECTS = ['16:9', '4:3', '21:9'];
+const DIMENSIONS = ['1920x1080', '2560x1440', '3840x2160', '5120x2880', 'custom'];
+const ASPECTS = ['16:9', '4:3', '21:9', '1:1', 'custom'];
 
 export default function DownloadList({
     items,
@@ -23,6 +24,50 @@ export default function DownloadList({
     processing = false,
 }: DownloadListProps) {
     const selectedCount = items.filter(i => i.selected).length;
+    const [customDimensions, setCustomDimensions] = useState<Record<string, string>>({});
+    const [customAspects, setCustomAspects] = useState<Record<string, string>>({});
+
+    const handleDimensionChange = (id: string, value: string) => {
+        if (value === 'custom') {
+            setCustomDimensions(prev => ({ ...prev, [id]: '' }));
+        } else {
+            setCustomDimensions(prev => { const n = { ...prev }; delete n[id]; return n; });
+            onUpdateItem(id, { dimension: value });
+        }
+    };
+
+    const handleCustomDimension = (id: string, value: string) => {
+        setCustomDimensions(prev => ({ ...prev, [id]: value }));
+        // Validate format WxH
+        if (/^\d+x\d+$/.test(value)) {
+            onUpdateItem(id, { dimension: value });
+        }
+    };
+
+    const handleAspectChange = (id: string, value: string) => {
+        if (value === 'custom') {
+            setCustomAspects(prev => ({ ...prev, [id]: '' }));
+        } else {
+            setCustomAspects(prev => { const n = { ...prev }; delete n[id]; return n; });
+            onUpdateItem(id, { aspect: value });
+        }
+    };
+
+    const handleCustomAspect = (id: string, value: string) => {
+        setCustomAspects(prev => ({ ...prev, [id]: value }));
+        // Validate format W:H
+        if (/^\d+:\d+$/.test(value)) {
+            onUpdateItem(id, { aspect: value });
+        }
+    };
+
+    const isCustomDimension = (item: DownloadItem) => {
+        return item.id in customDimensions || !DIMENSIONS.slice(0, -1).includes(item.dimension);
+    };
+
+    const isCustomAspect = (item: DownloadItem) => {
+        return item.id in customAspects || !ASPECTS.slice(0, -1).includes(item.aspect);
+    };
 
     return (
         <div className="flex flex-col h-full">
@@ -84,26 +129,46 @@ export default function DownloadList({
                                 </label>
 
                                 {/* Dimension select */}
-                                <select
-                                    value={item.dimension}
-                                    onChange={(e) => onUpdateItem(item.id, { dimension: e.target.value })}
-                                    className="text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
-                                >
-                                    {DIMENSIONS.map(d => (
-                                        <option key={d} value={d}>{d}</option>
-                                    ))}
-                                </select>
+                                {isCustomDimension(item) ? (
+                                    <input
+                                        type="text"
+                                        value={customDimensions[item.id] ?? item.dimension}
+                                        onChange={(e) => handleCustomDimension(item.id, e.target.value)}
+                                        placeholder="WxH"
+                                        className="w-20 text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+                                    />
+                                ) : (
+                                    <select
+                                        value={item.dimension}
+                                        onChange={(e) => handleDimensionChange(item.id, e.target.value)}
+                                        className="text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+                                    >
+                                        {DIMENSIONS.map(d => (
+                                            <option key={d} value={d}>{d === 'custom' ? 'Personalizado' : d}</option>
+                                        ))}
+                                    </select>
+                                )}
 
                                 {/* Aspect select */}
-                                <select
-                                    value={item.aspect}
-                                    onChange={(e) => onUpdateItem(item.id, { aspect: e.target.value })}
-                                    className="text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
-                                >
-                                    {ASPECTS.map(a => (
-                                        <option key={a} value={a}>{a}</option>
-                                    ))}
-                                </select>
+                                {isCustomAspect(item) ? (
+                                    <input
+                                        type="text"
+                                        value={customAspects[item.id] ?? item.aspect}
+                                        onChange={(e) => handleCustomAspect(item.id, e.target.value)}
+                                        placeholder="W:H"
+                                        className="w-14 text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+                                    />
+                                ) : (
+                                    <select
+                                        value={item.aspect}
+                                        onChange={(e) => handleAspectChange(item.id, e.target.value)}
+                                        className="text-[10px] bg-secondary text-secondary-foreground border border-border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+                                    >
+                                        {ASPECTS.map(a => (
+                                            <option key={a} value={a}>{a === 'custom' ? 'Personalizado' : a}</option>
+                                        ))}
+                                    </select>
+                                )}
 
                                 {/* Remove */}
                                 <button

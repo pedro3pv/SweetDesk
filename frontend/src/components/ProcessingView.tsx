@@ -9,7 +9,7 @@ declare global {
         go?: {
             main?: {
                 App?: {
-                    ProcessImage?: (base64Data: string, dimension: string, useSeamCarving: boolean) => Promise<void>;
+                    ProcessImage?: (base64Data: string, targetWidth: number, targetHeight: number, savePath: string, fileName: string) => Promise<string>;
                     DownloadImage?: (url: string) => Promise<string>;
                 };
             };
@@ -19,10 +19,11 @@ declare global {
 
 interface ProcessingViewProps {
     items: DownloadItem[];
+    savePath: string;
     onComplete: () => void;
 }
 
-export default function ProcessingView({ items, onComplete }: ProcessingViewProps) {
+export default function ProcessingView({ items, savePath, onComplete }: ProcessingViewProps) {
     const [progress, setProgress] = useState(0);
     const [currentItem, setCurrentItem] = useState(0);
     const [status, setStatus] = useState<'processing' | 'complete' | 'error'>('processing');
@@ -58,9 +59,14 @@ export default function ProcessingView({ items, onComplete }: ProcessingViewProp
                     }
 
                     if (base64Data) {
-                        const useSeamCarving = false;
+                        // Parse dimension string "WIDTHxHEIGHT" into numbers
+                        const parts = item.dimension.split('x');
+                        const targetWidth = parseInt(parts[0], 10) || 3840;
+                        const targetHeight = parseInt(parts[1], 10) || 2160;
+                        const fileName = (item.name || `wallpaper-${item.id}`) + '.png';
+
                         // @ts-ignore
-                        await window.go.main.App.ProcessImage(base64Data, item.dimension, useSeamCarving);
+                        await window.go.main.App.ProcessImage(base64Data, targetWidth, targetHeight, savePath, fileName);
                     } else {
                         // Fallback: simulate processing if we cannot obtain base64 data
                         await new Promise(r => setTimeout(r, 800 + Math.random() * 1200));
@@ -78,7 +84,7 @@ export default function ProcessingView({ items, onComplete }: ProcessingViewProp
             setProgress(Math.round(((i + 1) / selectedItems.length) * 100));
         }
         setStatus('complete');
-    }, [selectedItems]);
+    }, [selectedItems, savePath]);
 
     useEffect(() => {
         processItems();

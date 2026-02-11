@@ -8,6 +8,9 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"log"
+	"os"
+	"path/filepath"
 )
 
 // ImageProcessor handles all image processing operations
@@ -79,4 +82,40 @@ func (ip *ImageProcessor) ConvertToBase64(data []byte) string {
 // ConvertFromBase64 converts base64 string to image bytes
 func (ip *ImageProcessor) ConvertFromBase64(data string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(data)
+}
+
+// SaveToFile saves image bytes to a file at the given path
+func (ip *ImageProcessor) SaveToFile(data []byte, savePath string, fileName string) (string, error) {
+	if savePath == "" {
+		return "", fmt.Errorf("save path cannot be empty")
+	}
+
+	// Expand ~ to home directory
+	if len(savePath) > 0 && savePath[0] == '~' {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve home directory: %w", err)
+		}
+		savePath = filepath.Join(home, savePath[1:])
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(savePath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory %s: %w", savePath, err)
+	}
+
+	// Determine format from extension or default to png
+	ext := filepath.Ext(fileName)
+	if ext == "" {
+		fileName += ".png"
+	}
+
+	fullPath := filepath.Join(savePath, fileName)
+
+	if err := os.WriteFile(fullPath, data, 0644); err != nil {
+		return "", fmt.Errorf("failed to write file %s: %w", fullPath, err)
+	}
+
+	log.Printf("✅ Image saved: %s", fullPath)
+	return fullPath, nil
 }

@@ -14,8 +14,8 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
-export function ProcessImage(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ProcessImage'](arg1, arg2, arg3);
+export function ProcessImage(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ProcessImage'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SearchImages(arg1, arg2, arg3) {

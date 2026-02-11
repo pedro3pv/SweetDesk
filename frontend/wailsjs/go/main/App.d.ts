@@ -8,7 +8,7 @@ export function DownloadImage(arg1:string):Promise<string>;
 
 export function Greet(arg1:string):Promise<string>;
 
-export function ProcessImage(arg1:string,arg2:string,arg3:boolean):Promise<string>;
+export function ProcessImage(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string):Promise<string>;
 
 export function SearchImages(arg1:string,arg2:number,arg3:number):Promise<Array<services.ImageResult>>;
 

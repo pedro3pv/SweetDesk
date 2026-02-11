@@ -127,9 +127,13 @@ func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (stri
 }
 
 // ProcessImage is the main processing pipeline
-func (a *App) ProcessImage(base64Data string, targetResolution string) (string, error) {
+func (a *App) ProcessImage(base64Data string, targetWidth int, targetHeight int, savePath string, fileName string) (string, error) {
 	if a.upscaler == nil {
 		return "", fmt.Errorf("upscaler not initialized")
+	}
+
+	if targetWidth <= 0 || targetHeight <= 0 {
+		return "", fmt.Errorf("invalid target resolution: %dx%d", targetWidth, targetHeight)
 	}
 
 	// 1. Decode image
@@ -138,28 +142,12 @@ func (a *App) ProcessImage(base64Data string, targetResolution string) (string, 
 		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
 
-	// 2. Determine scale and options based on target resolution
-	var options *services.UpscaleOptions
-	switch targetResolution {
-	case "4K", "3840x2160":
-		options = &services.UpscaleOptions{
-			TargetWidth:     3840,
-			TargetHeight:    2160,
-			KeepAspectRatio: true,
-			Format:          "png",
-		}
-	case "1080p", "1920x1080":
-		options = &services.UpscaleOptions{
-			TargetWidth:     1920,
-			TargetHeight:    1080,
-			KeepAspectRatio: true,
-			Format:          "png",
-		}
-	default:
-		options = &services.UpscaleOptions{
-			ScaleFactor: 4.0,
-			Format:      "png",
-		}
+	// 2. Use custom width/height directly
+	options := &services.UpscaleOptions{
+		TargetWidth:     targetWidth,
+		TargetHeight:    targetHeight,
+		KeepAspectRatio: false,
+		Format:          "png",
 	}
 
 	// 3. Upscale image
@@ -168,6 +156,14 @@ func (a *App) ProcessImage(base64Data string, targetResolution string) (string, 
 		return "", fmt.Errorf("failed to upscale: %w", err)
 	}
 
-	// 4. Return result as base64
+	// 4. Save to file if savePath is provided
+	if savePath != "" && fileName != "" {
+		_, err := a.imageProcessor.SaveToFile(upscaled, savePath, fileName)
+		if err != nil {
+			return "", fmt.Errorf("failed to save image: %w", err)
+		}
+	}
+
+	// 5. Return result as base64
 	return a.imageProcessor.ConvertToBase64(upscaled), nil
 }
