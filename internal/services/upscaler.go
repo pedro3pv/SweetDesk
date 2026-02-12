@@ -39,11 +39,10 @@ type UpscaleOptions struct {
 type Upscaler struct {
 	ctx        context.Context
 	modelType  UpscalerType
-	backend    *gorgonnx.Graph
-	model      *onnx.Model
+	modelData  []byte // cached ONNX model bytes (immutable after init)
 	tileSize   int
 	modelScale int
-	mu         sync.Mutex // protects backend/model from concurrent access
+	mu         sync.Mutex // serializes inference to limit memory usage
 }
 
 // NewUpscaler cria upscaler com onnx-go (pure Go, sem DLL)
@@ -65,21 +64,20 @@ func NewUpscaler(ctx context.Context, modelType UpscalerType, modelsFS embed.FS)
 		return nil, fmt.Errorf("tipo de upscaler desconhecido: %s", modelType)
 	}
 
-	// Lê modelo do embed
+	// Lê modelo do embed e valida uma vez
 	modelData, err := modelsFS.ReadFile(modelPath)
 	if err != nil {
 		return nil, fmt.Errorf("modelo não encontrado: %w", err)
 	}
 
-	// Inicializa backend Gorgonia
-	u.backend = gorgonnx.NewGraph()
-	u.model = onnx.NewModel(u.backend)
-
-	// Carrega modelo ONNX
-	if err := u.model.UnmarshalBinary(modelData); err != nil {
+	// Valida modelo ONNX na inicialização
+	testBackend := gorgonnx.NewGraph()
+	testModel := onnx.NewModel(testBackend)
+	if err := testModel.UnmarshalBinary(modelData); err != nil {
 		return nil, fmt.Errorf("falha ao carregar modelo: %w", err)
 	}
 
+	u.modelData = modelData
 	log.Printf("✅ Modelo %s carregado (pure Go, sem DLL)", modelType)
 	return u, nil
 }
@@ -208,33 +206,37 @@ func (u *Upscaler) processTile(img image.Image) (image.Image, error) {
 		tensor.WithBacking(inputData),
 	)
 
-	// Lock the model for the critical section (SetInput → Run → GetOutput)
-	// gorgonnx.Graph uses internal maps that are not goroutine-safe
+	// Serialize inference calls to limit memory usage
 	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	// Cria backend+model frescos a cada inferência para evitar o bug do
+	// TapeMachine.Reset() na onnx-go v0.5.0 que retorna typed-nil error
+	// (Go nil-interface problem: interface não-nil com valor concreto nil).
+	backend := gorgonnx.NewGraph()
+	model := onnx.NewModel(backend)
+	if err := model.UnmarshalBinary(u.modelData); err != nil {
+		return nil, fmt.Errorf("falha ao recriar modelo: %w", err)
+	}
 
 	// Set input no modelo
-	if err := u.model.SetInput(0, inputTensor); err != nil {
-		u.mu.Unlock()
+	if err := model.SetInput(0, inputTensor); err != nil {
 		return nil, fmt.Errorf("falha ao setar input: %w", err)
 	}
 
 	// Executa inferência
-	if err := u.backend.Run(); err != nil {
-		u.mu.Unlock()
+	if err := backend.Run(); err != nil {
 		return nil, fmt.Errorf("falha na inferência: %w", err)
 	}
 
 	// Obtém output
-	outputs, err := u.model.GetOutputTensors()
+	outputs, err := model.GetOutputTensors()
 	if err != nil {
-		u.mu.Unlock()
 		return nil, fmt.Errorf("falha ao obter output: %w", err)
 	}
 
 	outputTensor := outputs[0]
 	outputData := outputTensor.Data().([]float32)
-
-	u.mu.Unlock()
 
 	// Converte tensor para imagem
 	outputSize := u.tileSize * u.modelScale
