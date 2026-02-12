@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface FolderSelectProps {
     onSelect: (path: string) => void;
@@ -9,20 +9,46 @@ interface FolderSelectProps {
 
 export default function FolderSelect({ onSelect, onCancel }: FolderSelectProps) {
     const [selectedPath, setSelectedPath] = useState('');
-    const [customPath, setCustomPath] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const commonPaths = [
-        { label: 'Desktop', path: '~/Desktop' },
-        { label: 'Downloads', path: '~/Downloads' },
-        { label: 'Imagens', path: '~/Pictures' },
-        { label: 'Wallpapers', path: '~/Pictures/Wallpapers' },
-        { label: 'Documentos', path: '~/Documents' },
-    ];
+    // On mount, try to get the default save path from backend
+    useEffect(() => {
+        async function loadDefault() {
+            try {
+                if (window.go?.main?.App?.GetDefaultSavePath) {
+                    const defaultPath = await window.go.main.App.GetDefaultSavePath();
+                    if (defaultPath) setSelectedPath(defaultPath);
+                }
+            } catch {
+                // ignore - will show empty
+            }
+        }
+        loadDefault();
+    }, []);
+
+    const handleBrowse = async () => {
+        setIsLoading(true);
+        try {
+            if (window.go?.main?.App?.SelectDirectory) {
+                const result = await window.go.main.App.SelectDirectory();
+                if (result) {
+                    setSelectedPath(result);
+                }
+            } else {
+                // Fallback: prompt for path if native dialog not available
+                const path = prompt('Digite o caminho da pasta:', selectedPath);
+                if (path) setSelectedPath(path);
+            }
+        } catch (err) {
+            console.error('Failed to open directory dialog:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleConfirm = () => {
-        const path = customPath || selectedPath;
-        if (path) {
-            onSelect(path);
+        if (selectedPath) {
+            onSelect(selectedPath);
         }
     };
 
@@ -52,42 +78,31 @@ export default function FolderSelect({ onSelect, onCancel }: FolderSelectProps) 
                         </svg>
                     </div>
 
-                    {/* Common paths */}
-                    <div className="flex flex-col gap-2 mb-6">
-                        {commonPaths.map(p => (
-                            <button
-                                key={p.path}
-                                onClick={() => { setSelectedPath(p.path); setCustomPath(''); }}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-md border text-sm text-left transition-colors ${
-                                    selectedPath === p.path && !customPath
-                                        ? 'bg-primary/10 border-primary text-foreground'
-                                        : 'bg-card border-border text-foreground hover:bg-muted'
-                                }`}
-                            >
-                                <svg className="w-4 h-4 text-muted-foreground shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                </svg>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-medium">{p.label}</p>
-                                    <p className="text-xs text-muted-foreground truncate">{p.path}</p>
-                                </div>
-                            </button>
-                        ))}
+                    {/* Selected path display */}
+                    <div className="mb-4">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                            Pasta selecionada
+                        </label>
+                        <div className="w-full px-3 py-3 bg-input border border-border rounded-md text-sm text-foreground min-h-[42px] flex items-center">
+                            {selectedPath ? (
+                                <span className="truncate">{selectedPath}</span>
+                            ) : (
+                                <span className="text-muted-foreground">Nenhuma pasta selecionada</span>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Custom path */}
-                    <div className="mb-6">
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                            Ou digite um caminho personalizado
-                        </label>
-                        <input
-                            type="text"
-                            value={customPath}
-                            onChange={(e) => { setCustomPath(e.target.value); setSelectedPath(''); }}
-                            placeholder="/caminho/para/pasta"
-                            className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                    </div>
+                    {/* Browse button - opens native OS dialog */}
+                    <button
+                        onClick={handleBrowse}
+                        disabled={isLoading}
+                        className="w-full mb-6 py-3 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:bg-secondary/80 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        {isLoading ? 'Abrindo...' : 'Escolher Pasta'}
+                    </button>
 
                     {/* Actions */}
                     <div className="flex gap-3">
@@ -99,7 +114,7 @@ export default function FolderSelect({ onSelect, onCancel }: FolderSelectProps) 
                         </button>
                         <button
                             onClick={handleConfirm}
-                            disabled={!selectedPath && !customPath}
+                            disabled={!selectedPath}
                             className="flex-1 py-3 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             Confirmar

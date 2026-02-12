@@ -1,20 +1,31 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 import type { DownloadItem } from '../lib/types';
 
-// Extend the Window interface to include 'go'
-declare global {
-    interface Window {
-        go?: {
-            main?: {
-                App?: {
-                    ProcessImage?: (base64Data: string, targetWidth: number, targetHeight: number, savePath: string, fileName: string) => Promise<string>;
-                    DownloadImage?: (url: string) => Promise<string>;
-                };
-            };
-        };
-    }
+// --- Backend types (mirrors Go structs) ---
+interface BatchItem {
+    id: string;
+    base64Data: string;
+    downloadURL: string;
+    name: string;
+    dimension: string;
+}
+
+interface BatchItemStatus {
+    id: string;
+    status: 'pending' | 'processing' | 'done' | 'error';
+    error?: string;
+}
+
+interface ProcessingStatus {
+    isProcessing: boolean;
+    total: number;
+    current: number;
+    progress: number;
+    items: BatchItemStatus[];
+    done: boolean;
 }
 
 interface ProcessingViewProps {
@@ -28,100 +39,122 @@ export default function ProcessingView({ items, savePath, onComplete }: Processi
     const [currentItem, setCurrentItem] = useState(0);
     const [status, setStatus] = useState<'processing' | 'complete' | 'error'>('processing');
     const [itemStatuses, setItemStatuses] = useState<Record<string, 'pending' | 'processing' | 'done' | 'error'>>(
-        Object.fromEntries(items.map(i => [i.id, 'pending' as const]))
+        () => Object.fromEntries(items.filter(i => i.selected).map(i => [i.id, 'pending' as const]))
     );
 
     const selectedItems = items.filter(i => i.selected);
+    const hasStartedRef = useRef(false);
 
-    // Helper: sanitize filename to avoid path traversal and invalid chars
-    function sanitizeFilename(input: string, defaultExt: string = '.png'): string {
-        // Strip any path components and get basename only
-        let name = input.replace(/^.*[\/]/, '');
-
-        // Remove dangerous characters: <>:"/\|?* and control chars (0x00-0x1F)
-        name = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
-
-        // Remove leading/trailing dots and spaces
-        name = name.replace(/^[.\s]+|[.\s]+$/g, '');
-
-        // Handle Windows reserved names
-        const reservedNames = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
-        if (reservedNames.test(name.split('.')[0])) {
-            name = '_' + name;
+    // Apply a ProcessingStatus update from the backend
+    function applyStatus(ps: ProcessingStatus) {
+        if (!ps || !ps.items) return;
+        setProgress(ps.progress);
+        setCurrentItem(ps.current);
+        const newStatuses: Record<string, 'pending' | 'processing' | 'done' | 'error'> = {};
+        for (const item of ps.items) {
+            newStatuses[item.id] = item.status as 'pending' | 'processing' | 'done' | 'error';
         }
-
-        // Check for extension
-        const hasExtension = /\.[a-zA-Z0-9]{1,6}$/.test(name);
-        if (!hasExtension) {
-            name += defaultExt;
+        setItemStatuses(newStatuses);
+        if (ps.done) {
+            setStatus('complete');
         }
-
-        // Enforce 255-char limit
-        if (name.length > 255) {
-            const ext = name.match(/\.[^.]+$/)?.[0] || '';
-            const base = name.slice(0, 255 - ext.length);
-            name = base + ext;
-        }
-
-        return name || `wallpaper_${Date.now()}${defaultExt}`;
     }
 
-    const processItems = useCallback(async () => {
-        if (selectedItems.length === 0) {
-            setProgress(100);
-            setStatus('complete');
-            return;
-        }
-        for (let i = 0; i < selectedItems.length; i++) {
-            const item = selectedItems[i];
-            setCurrentItem(i);
-            setItemStatuses(prev => ({ ...prev, [item.id]: 'processing' }));
-
+    // On mount: recover existing progress OR start new batch
+    useEffect(() => {
+        async function recoverOrStart() {
             try {
-                // Try Wails backend first
-                // @ts-ignore
-                if (typeof window !== 'undefined' && window.go?.main?.App?.ProcessImage) {
-                    let base64Data: string | null = null;
+                if (window.go?.main?.App?.GetProcessingStatus) {
+                    const ps = await window.go.main.App.GetProcessingStatus();
 
-                    if (item.image.downloadURL.startsWith('data:')) {
-                        // Strip the data URL prefix and keep only the base64 payload
-                        base64Data = item.image.downloadURL.split(',')[1] || null;
-                    } else if (window.go.main.App.DownloadImage) {
-                        // @ts-ignore - Download and convert remote image URL to base64 via Wails binding
-                        base64Data = await window.go.main.App.DownloadImage(item.image.downloadURL);
+                    if (ps && ps.items && ps.items.length > 0) {
+                        // Compare backend item IDs with our current items
+                        // to distinguish HMR re-mount from a brand-new batch
+                        const backendIds = new Set(ps.items.map((i: BatchItemStatus) => i.id));
+                        const currentIds = new Set(items.filter(i => i.selected).map(i => i.id));
+                        const sameItems =
+                            backendIds.size === currentIds.size &&
+                            [...backendIds].every(id => currentIds.has(id));
+
+                        if (sameItems && ps.isProcessing) {
+                            // HMR during active processing — just recover state
+                            applyStatus(ps);
+                            hasStartedRef.current = true;
+                            return;
+                        }
+                        if (sameItems && ps.done) {
+                            // HMR after batch already completed — show finished state
+                            applyStatus(ps);
+                            hasStartedRef.current = true;
+                            return;
+                        }
+                        // Items differ → fall through and start a new batch
                     }
-
-                    if (base64Data) {
-                        // Parse dimension string "WIDTHxHEIGHT" into numbers
-                        const parts = item.dimension.split('x');
-                        const targetWidth = parseInt(parts[0], 10) || 3840;
-                        const targetHeight = parseInt(parts[1], 10) || 2160;
-                        const fileName = sanitizeFilename(item.name || `wallpaper-${item.id}`, '.png');
-
-                        // @ts-ignore
-                        await window.go.main.App.ProcessImage(base64Data, targetWidth, targetHeight, savePath, fileName);
-                    } else {
-                        // Fallback: simulate processing if we cannot obtain base64 data
-                        await new Promise(r => setTimeout(r, 800 + Math.random() * 1200));
-                    }
-                } else {
-                    // Simulate processing
-                    await new Promise(r => setTimeout(r, 800 + Math.random() * 1200));
                 }
-
-                setItemStatuses(prev => ({ ...prev, [item.id]: 'done' }));
             } catch {
-                setItemStatuses(prev => ({ ...prev, [item.id]: 'error' }));
+                // ignore — will start fresh
             }
 
-            setProgress(Math.round(((i + 1) / selectedItems.length) * 100));
+            if (!hasStartedRef.current) {
+                hasStartedRef.current = true;
+                startBatch();
+            }
         }
-        setStatus('complete');
-    }, [selectedItems, savePath]);
 
+        function startBatch() {
+            const selected = items.filter(i => i.selected);
+            if (selected.length === 0) {
+                setProgress(100);
+                setStatus('complete');
+                return;
+            }
+
+            // Build batch items for the backend
+            const batchItems: BatchItem[] = selected.map(item => {
+                let base64Data = '';
+                let downloadURL = item.image.downloadURL || '';
+
+                if (downloadURL.startsWith('data:')) {
+                    base64Data = downloadURL.split(',')[1] || '';
+                    downloadURL = '';
+                }
+
+                // Sanitize filename
+                let name = (item.name || `wallpaper-${item.id}`).replace(/^.*[\/]/, '');
+                name = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+                name = name.replace(/^[.\s]+|[.\s]+$/g, '');
+                if (!/\.[a-zA-Z0-9]{1,6}$/.test(name)) name += '.png';
+                if (!name) name = `wallpaper_${Date.now()}.png`;
+
+                return {
+                    id: item.id,
+                    base64Data,
+                    downloadURL,
+                    name,
+                    dimension: item.dimension || '3840x2160',
+                };
+            });
+
+            // Fire and forget — backend processes in a goroutine
+            if (window.go?.main?.App?.ProcessBatch) {
+                window.go.main.App.ProcessBatch(batchItems, savePath);
+            }
+        }
+
+        recoverOrStart();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Listen for real-time progress events from backend
     useEffect(() => {
-        processItems();
-    }, [processItems]);
+        function handleEvent(...args: unknown[]) {
+            const ps = args[0] as ProcessingStatus;
+            applyStatus(ps);
+        }
+
+        // EventsOn returns a cancel function
+        const cancel = EventsOn('processing:status', handleEvent);
+        return () => { cancel(); };
+    }, []);
 
     return (
         <div className="flex flex-col h-full">

@@ -24,7 +24,7 @@ export default function ProcessingPanel({
     const [progress, setProgress] = useState<string>('');
 
     const handleProcess = async () => {
-        if (!imageData) return;
+        if (!imageData || isProcessing) return;
 
         onProcessStart();
         setProgress('Starting processing...');

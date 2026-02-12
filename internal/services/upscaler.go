@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/owulveryck/onnx-go"
 	"github.com/owulveryck/onnx-go/backend/x/gorgonnx"
@@ -42,6 +43,7 @@ type Upscaler struct {
 	model      *onnx.Model
 	tileSize   int
 	modelScale int
+	mu         sync.Mutex // protects backend/model from concurrent access
 }
 
 // NewUpscaler cria upscaler com onnx-go (pure Go, sem DLL)
@@ -206,24 +208,33 @@ func (u *Upscaler) processTile(img image.Image) (image.Image, error) {
 		tensor.WithBacking(inputData),
 	)
 
+	// Lock the model for the critical section (SetInput → Run → GetOutput)
+	// gorgonnx.Graph uses internal maps that are not goroutine-safe
+	u.mu.Lock()
+
 	// Set input no modelo
 	if err := u.model.SetInput(0, inputTensor); err != nil {
+		u.mu.Unlock()
 		return nil, fmt.Errorf("falha ao setar input: %w", err)
 	}
 
 	// Executa inferência
 	if err := u.backend.Run(); err != nil {
+		u.mu.Unlock()
 		return nil, fmt.Errorf("falha na inferência: %w", err)
 	}
 
 	// Obtém output
 	outputs, err := u.model.GetOutputTensors()
 	if err != nil {
+		u.mu.Unlock()
 		return nil, fmt.Errorf("falha ao obter output: %w", err)
 	}
 
 	outputTensor := outputs[0]
 	outputData := outputTensor.Data().([]float32)
+
+	u.mu.Unlock()
 
 	// Converte tensor para imagem
 	outputSize := u.tileSize * u.modelScale
