@@ -17,7 +17,7 @@ require (
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/leesper/go_rng v0.0.0-20190531154944-a612b043e353 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/pedro3pv/SweetDesk-core v0.0.0-20260214133840-f67b0add7ed0 // indirect
+	github.com/pedro3pv/SweetDesk-core v0.0.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect

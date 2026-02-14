@@ -180,6 +180,8 @@ github.com/owulveryck/onnx-go v0.5.0 h1:dnSKdTVs8gCbI3MUu91J74YjnYQTDEjoQluN0+/b
 github.com/owulveryck/onnx-go v0.5.0/go.mod h1:J+buXYZXhLtuMBfBYzM1O2u0tfFjpDExpQe9NhCkyPI=
 github.com/pedro3pv/SweetDesk-core v0.0.0-20260214133840-f67b0add7ed0 h1:0Y04FTwIosE/MMWaeQW5FLkB/+IC3YuWN7VBhaM6MHQ=
 github.com/pedro3pv/SweetDesk-core v0.0.0-20260214133840-f67b0add7ed0/go.mod h1:mN7iHf/hYcWzok109D+iUqGH7WyEn3rtg8ILwCJA2O4=
+github.com/pedro3pv/SweetDesk-core v0.0.1 h1:Js3bNFl9SbENcv75dwpCA1OutJK6JWgrRBlhH4xzfFg=
+github.com/pedro3pv/SweetDesk-core v0.0.1/go.mod h1:mN7iHf/hYcWzok109D+iUqGH7WyEn3rtg8ILwCJA2O4=
 github.com/phpdave11/gofpdf v1.4.2/go.mod h1:zpO6xFn9yxo3YLyMvW8HcKWVdbNqgIfOOp2dXMnm1mY=
 github.com/phpdave11/gofpdi v1.0.12/go.mod h1:vBmVV0Do6hSBHC8uKUQ71JGW+ZGQq74llk/7bXwjDoI=
 github.com/phpdave11/gofpdi v1.0.13/go.mod h1:vBmVV0Do6hSBHC8uKUQ71JGW+ZGQq74llk/7bXwjDoI=
