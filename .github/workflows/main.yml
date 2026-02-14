@@ -180,31 +180,43 @@ jobs:
           ls -laR release-artifacts/
 
 
-      - name: Prepare release files
+      - name: Prepare and ZIP release files
         run: |
           mkdir -p release-files
           
-          # Copiar e renomear arquivos Linux
+          # Linux: Criar ZIP com binário
           if [ -d "release-artifacts/app-linux-amd64" ]; then
-            find release-artifacts/app-linux-amd64 -type f -name "SweetDesk*" -exec cp {} release-files/SweetDesk-linux-amd64 \;
+            echo "📦 Criando ZIP para Linux..."
+            cd release-artifacts/app-linux-amd64
+            zip -r ../../release-files/SweetDesk-linux-amd64.zip ./*
+            cd ../..
+            echo "✅ SweetDesk-linux-amd64.zip criado"
           fi
           
-          # Copiar e renomear arquivos Windows
+          # Windows: Criar ZIP com .exe
           if [ -d "release-artifacts/app-windows-amd64.exe" ]; then
-            find release-artifacts/app-windows-amd64.exe -type f -name "*.exe" -exec cp {} release-files/SweetDesk-windows-amd64.exe \;
+            echo "📦 Criando ZIP para Windows..."
+            cd release-artifacts/app-windows-amd64.exe
+            zip -r ../../release-files/SweetDesk-windows-amd64.zip ./*
+            cd ../..
+            echo "✅ SweetDesk-windows-amd64.zip criado"
           fi
           
-          # Copiar e renomear arquivos macOS
+          # macOS: Criar ZIP com .app
           if [ -d "release-artifacts/app-darwin-arm64" ]; then
-            find release-artifacts/app-darwin-arm64 -type f -name "*.app" -exec cp -r {} release-files/SweetDesk-darwin-arm64.app \;
-            # Se não encontrar .app, procurar binário
-            if [ ! -d "release-files/SweetDesk-darwin-arm64.app" ]; then
-              find release-artifacts/app-darwin-arm64 -type f -name "SweetDesk*" ! -name "*.app" -exec cp {} release-files/SweetDesk-darwin-arm64 \;
-            fi
+            echo "📦 Criando ZIP para macOS..."
+            cd release-artifacts/app-darwin-arm64
+            zip -r ../../release-files/SweetDesk-darwin-arm64.zip ./*
+            cd ../..
+            echo "✅ SweetDesk-darwin-arm64.zip criado"
           fi
           
+          echo ""
           echo "📋 Arquivos preparados para release:"
           ls -lah release-files/
+          echo ""
+          echo "📊 Tamanho dos ZIPs:"
+          du -h release-files/*.zip
 
 
       - name: Create Release
@@ -219,12 +231,12 @@ jobs:
             
             | Platform | File |
             |----------|------|
-            | 🐧 Linux (x64) | `SweetDesk-linux-amd64` |
-            | 🪟 Windows (x64) | `SweetDesk-windows-amd64.exe` |
-            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64` |
+            | 🐧 Linux (x64) | `SweetDesk-linux-amd64.zip` |
+            | 🪟 Windows (x64) | `SweetDesk-windows-amd64.zip` |
+            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64.zip` |
             
             ### 📝 Changelog
-          files: release-files/*
+          files: release-files/*.zip
           generate_release_notes: true
           draft: false
           prerelease: false
