@@ -49,4 +49,4 @@ require (
 )
 
 // Uncomment to use local development version
-// replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core
+replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core

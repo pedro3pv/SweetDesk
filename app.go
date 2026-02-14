@@ -3,7 +3,6 @@ package main
 import (
 	"SweetDesk/internal/services"
 	"context"
-	"embed"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/pedro3pv/SweetDesk-core/pkg/types"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -46,7 +46,6 @@ type App struct {
 	imageProcessor *services.ImageProcessor
 	coreBridge     *services.CoreBridge
 	pixabayKey     string
-	modelsFS       embed.FS
 
 	// Batch processing state
 	procMu     sync.Mutex
@@ -54,10 +53,8 @@ type App struct {
 }
 
 // NewApp creates a new App application struct
-func NewApp(modelsFS embed.FS) *App {
-	return &App{
-		modelsFS: modelsFS,
-	}
+func NewApp() *App {
+	return &App{}
 }
 
 // startup is called at application startup
@@ -68,7 +65,7 @@ func (a *App) startup(ctx context.Context) {
 	a.imageProcessor = services.NewImageProcessor(ctx)
 
 	// Initialize SweetDesk-core bridge
-	bridge, err := services.NewCoreBridge(ctx, a.modelsFS, "")
+	bridge, err := services.NewCoreBridge(ctx)
 	if err != nil {
 		log.Fatalf("Failed to initialize SweetDesk-core bridge: %v", err)
 	}
@@ -188,7 +185,7 @@ func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (stri
 		return "", err
 	}
 
-	opts := &services.ProcessingOptions{
+	opts := &types.ProcessingOptions{
 		TargetWidth:     0,
 		TargetHeight:    0,
 		ScaleFactor:     float64(scale),
@@ -237,7 +234,7 @@ func (a *App) ProcessImage(base64Data string, targetWidth int, targetHeight int,
 		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
 
-	opts := &services.ProcessingOptions{
+	opts := &types.ProcessingOptions{
 		TargetWidth:     targetWidth,
 		TargetHeight:    targetHeight,
 		ScaleFactor:     0,
@@ -299,7 +296,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 		}()
 
 		// Prepare batch items for SweetDesk-core
-		batchItems := make([]services.BatchItem, len(items))
+		batchItems := make([]types.BatchItem, len(items))
 		for i, item := range items {
 			// Get base64 data: either provided directly or download from URL
 			base64Data := item.Base64Data
@@ -350,7 +347,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 			}
 
 			// Save input to temp file
-			tmpInput := filepath.Join(a.coreBridge.tmpDir, fmt.Sprintf("batch-%s-input.png", item.ID))
+			tmpInput := filepath.Join(a.coreBridge.TmpDir, fmt.Sprintf("batch-%s-input.png", item.ID))
 			if err := os.WriteFile(tmpInput, data, 0644); err != nil {
 				a.procMu.Lock()
 				a.procStatus.Items[i].Status = "error"
@@ -362,7 +359,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 
 			tmpOutput := filepath.Join(savePath, fileName)
 
-			opts := &services.ProcessingOptions{
+			opts := &types.ProcessingOptions{
 				TargetWidth:     targetWidth,
 				TargetHeight:    targetHeight,
 				ScaleFactor:     0,
@@ -370,7 +367,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 				KeepAspectRatio: false,
 			}
 
-			batchItems[i] = services.BatchItem{
+			batchItems[i] = types.BatchItem{
 				InputPath:  tmpInput,
 				OutputPath: tmpOutput,
 				Options:    opts,
@@ -378,7 +375,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 		}
 
 		// Progress callback for UI
-		progressCallback := func(current, total int, item services.BatchItem) {
+		progressCallback := func(current, total int, item types.BatchItem) {
 			a.procMu.Lock()
 			a.procStatus.Current = current - 1
 			a.procStatus.Progress = int(float64(current) / float64(total) * 100)
@@ -407,45 +404,6 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 		a.procMu.Unlock()
 		a.emitProcessingStatus()
 	}()
-}
-
-// processOneItem handles downloading (if needed) and upscaling a single item
-func (a *App) processOneItem(item BatchItem, savePath string) error {
-	if a.upscaler == nil {
-		return fmt.Errorf("upscaler not initialized")
-	}
-
-	// Get base64 data: either provided directly or download from URL
-	base64Data := item.Base64Data
-	if base64Data == "" && item.DownloadURL != "" {
-		downloaded, err := a.DownloadImage(item.DownloadURL)
-		if err != nil {
-			return fmt.Errorf("failed to download image: %w", err)
-		}
-		base64Data = downloaded
-	}
-	if base64Data == "" {
-		return fmt.Errorf("no image data available for item %s", item.ID)
-	}
-
-	// Parse dimensions from "WIDTHxHEIGHT"
-	targetWidth, targetHeight := 3840, 2160
-	if item.Dimension != "" {
-		fmt.Sscanf(item.Dimension, "%dx%d", &targetWidth, &targetHeight)
-	}
-
-	// Sanitize filename
-	fileName := item.Name
-	if fileName == "" {
-		fileName = fmt.Sprintf("wallpaper-%s.png", item.ID)
-	}
-	if filepath.Ext(fileName) == "" {
-		fileName += ".png"
-	}
-
-	// Process via existing ProcessImage pipeline
-	_, err := a.ProcessImage(base64Data, targetWidth, targetHeight, savePath, fileName)
-	return err
 }
 
 // GetProcessingStatus returns the current batch processing state.

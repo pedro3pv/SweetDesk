@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,13 +16,12 @@ import (
 type CoreBridge struct {
 	ctx       context.Context
 	processor *processor.ImageProcessor
-	tmpDir    string // temp directory for file-based operations
+	TmpDir    string // temp directory for file-based operations
 }
 
 // NewCoreBridge creates a new CoreBridge instance.
-// modelsFS should contain the embedded ONNX model files.
-// If modelsFS is nil, models are expected at modelDir on the filesystem.
-func NewCoreBridge(ctx context.Context, modelsFS fs.FS, modelDir string) (*CoreBridge, error) {
+// SweetDesk-core embeds models internally, so no modelsFS/modelDir is needed.
+func NewCoreBridge(ctx context.Context) (*CoreBridge, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -35,16 +33,8 @@ func NewCoreBridge(ctx context.Context, modelsFS fs.FS, modelDir string) (*CoreB
 	}
 
 	// Build config for SweetDesk-core
+	// Core will auto-use its internally embedded models
 	config := processor.Config{}
-
-	if modelsFS != nil {
-		config.ModelsFS = modelsFS
-	} else if modelDir != "" {
-		config.ModelDir = modelDir
-	} else {
-		os.RemoveAll(tmpDir)
-		return nil, fmt.Errorf("either modelsFS or modelDir must be provided")
-	}
 
 	// Optional ONNX Runtime path from environment
 	if onnxPath := os.Getenv("ONNX_LIB_PATH"); onnxPath != "" {
@@ -61,7 +51,7 @@ func NewCoreBridge(ctx context.Context, modelsFS fs.FS, modelDir string) (*CoreB
 	bridge := &CoreBridge{
 		ctx:       ctx,
 		processor: proc,
-		tmpDir:    tmpDir,
+		TmpDir:    tmpDir,
 	}
 
 	log.Println("✅ SweetDesk-core bridge initialized")
@@ -76,7 +66,7 @@ func (cb *CoreBridge) ClassifyImage(imageData []byte) (types.ImageType, float32,
 	}
 
 	// SweetDesk-core Classify expects a file path, write to temp
-	tmpFile := filepath.Join(cb.tmpDir, "classify-input.png")
+	tmpFile := filepath.Join(cb.TmpDir, "classify-input.png")
 	if err := os.WriteFile(tmpFile, imageData, 0644); err != nil {
 		return types.ImageTypeUnknown, 0, fmt.Errorf("failed to write temp file: %w", err)
 	}
@@ -98,14 +88,14 @@ func (cb *CoreBridge) UpscaleBytes(imageData []byte, opts *types.ProcessingOptio
 	}
 
 	// Write input to temp file
-	tmpInput := filepath.Join(cb.tmpDir, "upscale-input.png")
+	tmpInput := filepath.Join(cb.TmpDir, "upscale-input.png")
 	if err := os.WriteFile(tmpInput, imageData, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write input temp file: %w", err)
 	}
 	defer os.Remove(tmpInput)
 
 	// Output temp file
-	tmpOutput := filepath.Join(cb.tmpDir, "upscale-output.png")
+	tmpOutput := filepath.Join(cb.TmpDir, "upscale-output.png")
 	defer os.Remove(tmpOutput)
 
 	// Process with options
@@ -167,9 +157,9 @@ func (cb *CoreBridge) Close() error {
 	}
 
 	// Cleanup temp directory
-	if cb.tmpDir != "" {
-		os.RemoveAll(cb.tmpDir)
-		cb.tmpDir = ""
+	if cb.TmpDir != "" {
+		os.RemoveAll(cb.TmpDir)
+		cb.TmpDir = ""
 	}
 
 	log.Println("✅ SweetDesk-core bridge closed")
