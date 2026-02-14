@@ -2,338 +2,598 @@
 
 ## Overview
 
-SweetDesk has been refactored to use **SweetDesk-Core** as its backend image processing engine. SweetDesk-Core is a powerful ONNX Runtime-based processor that provides:
+This guide covers integrating SweetDesk-Core into your Wails application for advanced image processing capabilities.
 
-- ✅ **Intelligent Upscaling**: RealCUGAN (anime) and LSDIR (realistic) models
-- ✅ **Automatic Classification**: Detects image type and chooses optimal model
-- ✅ **Seam Carving**: Content-aware aspect ratio adjustment
-- ✅ **Embedded Libraries**: ONNX Runtime bundled in executable
-- ✅ **Hardware Acceleration**: CoreML (macOS), CUDA (Linux/Windows)
-- ✅ **Tiling Support**: Handles large images efficiently
+## Quick Start
 
-## Architecture Changes
+### 1. Installation
 
-### Before (Legacy)
-```
-Frontend (React/Vue)
-    ↓
-Wails App (app.go)
-    ↓
-Legacy Services
-    ├── Python Bridge (classif + seam carving)
-    ├── Local Upscaler (RealESRGAN/RealCUGAN binaries)
-    └── Manual binary management
+```bash
+go get -u github.com/pedro3pv/SweetDesk-core
+go mod tidy
+go generate ./...
 ```
 
-### After (SweetDesk-Core)
-```
-Frontend (React/Vue)
-    ↓
-Wails App (app.go)
-    ↓
-SweetDesk-Core Processor (unified)
-    ├── ONNX Runtime (embedded)
-    ├── Classifier (ONNX model)
-    ├── Upscaler (ONNX models)
-    └── Seam Carver (native Go)
-```
+### 2. Basic Usage
 
-## Key Changes
-
-### 1. Dependencies (`go.mod`)
-
-**Added:**
 ```go
-require github.com/pedro3pv/SweetDesk-core v0.0.0-20260214000000-000000000000
-```
+package main
 
-**Removed (optional):**
-- Python dependencies (no longer needed for classification/seam carving)
-- Manual upscaler binary management
+import (
+    "log"
+    "github.com/pedro3pv/SweetDesk-core/pkg/processor"
+)
 
-### 2. Application (`app.go`)
-
-**Old approach:**
-```go
-type App struct {
-    imageProcessor *services.ImageProcessor
-    upscaler       *services.Upscaler        // External binaries
-    pythonBridge   *services.PythonBridge    // Classification + seam carving
+func main() {
+    // Initialize processor
+    proc, err := processor.New(processor.Config{
+        ModelDir: "./models",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer proc.Close()
+    
+    // Process image
+    result, err := proc.Upscale(imageData, processor.ProcessOptions{
+        TargetScale:  4,
+        OutputFormat: "png",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Use result
+    log.Printf("Upscaled to %dx%d", result.Width, result.Height)
 }
 ```
 
-**New approach:**
+---
+
+## API Reference
+
+### Processor Interface
+
+#### Creating a Processor
+
 ```go
-type App struct {
-    coreProcessor    *processor.Processor    // All-in-one from SweetDesk-core
-    imageProcessor   *services.ImageProcessor // Base64 conversions only
+config := processor.Config{
+    ModelDir:     "./models",      // Optional: model directory path
+    ONNXLibPath:  "/path/to/lib",  // Optional: ONNX Runtime library path
+    CacheSize:    1000,             // Optional: cache size in MB
+    MaxWorkers:   4,                // Optional: number of worker threads
+}
+
+proc, err := processor.New(config)
+if err != nil {
+    log.Fatalf("Failed to initialize: %v", err)
+}
+defer proc.Close()
+```
+
+#### Available Methods
+
+```go
+type Processor interface {
+    // Image classification
+    Classify(imageData []byte) (*ClassifyResult, error)
+    
+    // Upscaling (4x fixed)
+    Upscale(imageData []byte, opts ProcessOptions) (*UpscaleResult, error)
+    
+    // Content-aware resizing
+    SeamCarve(imageData []byte, targetWidth, targetHeight int) (*SeamCarvingResult, error)
+    
+    // Full pipeline: classify -> upscale -> seam carve
+    Process(imageData []byte, opts ProcessOptions) (*ProcessResult, error)
+    
+    // Resource cleanup
+    Close() error
 }
 ```
 
-### 3. Core Bridge Adapter
+---
 
-Created `internal/services/core_bridge.go` for backwards compatibility:
+## Detailed Methods
+
+### Classification
 
 ```go
-type CoreBridge struct {
+result, err := proc.Classify(imageData)
+if err != nil {
+    return fmt.Errorf("classification failed: %w", err)
+}
+
+switch result.Type {
+case processor.TypePhoto:
+    log.Println("Detected: Photo")
+case processor.TypeArtwork:
+    log.Println("Detected: Artwork")
+case processor.TypeScreenshot:
+    log.Println("Detected: Screenshot")
+default:
+    log.Println("Unknown type")
+}
+
+log.Printf("Confidence: %.2f%%", result.Confidence*100)
+```
+
+**Result Structure:**
+
+```go
+type ClassifyResult struct {
+    Type       string      // "photo", "artwork", "screenshot"
+    Confidence float32     // 0.0-1.0
+    Labels     []string    // Additional labels
+    Metadata   map[string]interface{}
+}
+```
+
+### Upscaling
+
+```go
+options := processor.ProcessOptions{
+    TargetScale:   4,           // 2x, 4x, or 8x
+    OutputFormat:  "png",       // "png" or "jpg"
+    JPEGQuality:   95,          // 1-100 (if JPEG)
+}
+
+result, err := proc.Upscale(imageData, options)
+if err != nil {
+    return fmt.Errorf("upscaling failed: %w", err)
+}
+
+log.Printf("Upscaled %dx%d -> %dx%d",
+    result.OriginalWidth, result.OriginalHeight,
+    result.Width, result.Height)
+```
+
+**Result Structure:**
+
+```go
+type UpscaleResult struct {
+    Data              []byte
+    Width, Height     int
+    OriginalWidth     int
+    OriginalHeight    int
+    Format            string
+    ProcessingTime    time.Duration
+    ModelUsed         string
+}
+```
+
+### Content-Aware Resizing (Seam Carving)
+
+```go
+result, err := proc.SeamCarve(imageData, 1920, 1080)
+if err != nil {
+    return fmt.Errorf("seam carving failed: %w", err)
+}
+
+log.Printf("Resized to %dx%d",
+    result.Width, result.Height)
+log.Printf("Removed %d vertical, %d horizontal seams",
+    result.VerticalSeamsRemoved,
+    result.HorizontalSeamsRemoved)
+```
+
+**Result Structure:**
+
+```go
+type SeamCarvingResult struct {
+    Data                  []byte
+    Width, Height         int
+    OriginalWidth         int
+    OriginalHeight        int
+    VerticalSeamsRemoved  int
+    HorizontalSeamsRemoved int
+    ProcessingTime        time.Duration
+}
+```
+
+### Full Processing Pipeline
+
+```go
+options := processor.ProcessOptions{
+    TargetWidth:        3840,           // Target resolution
+    TargetHeight:       2160,           // 4K
+    TargetAspectRatio:  "16:9",         // Aspect ratio constraint
+    UseSeamCarving:     true,           // Enable content-aware resizing
+    KeepAspectRatio:    true,           // Preserve original aspect ratio
+    OutputFormat:       "png",          // Output format
+}
+
+result, err := proc.Process(imageData, options)
+if err != nil {
+    return fmt.Errorf("processing failed: %w", err)
+}
+
+log.Printf("Pipeline complete:")
+log.Printf("  - Classification: %s (%.0f%% confidence)",
+    result.Classification.Type,
+    result.Classification.Confidence*100)
+log.Printf("  - Upscaling: %dx%d -> %dx%d",
+    result.OriginalWidth, result.OriginalHeight,
+    result.UpscaledWidth, result.UpscaledHeight)
+log.Printf("  - Total time: %v", result.TotalProcessingTime)
+```
+
+**Result Structure:**
+
+```go
+type ProcessResult struct {
+    Data              []byte
+    Width, Height     int
+    OriginalWidth     int
+    OriginalHeight    int
+    UpscaledWidth     int
+    UpscaledHeight    int
+    Classification    ClassifyResult
+    Format            string
+    ModelsUsed        []string
+    TotalProcessingTime time.Duration
+}
+```
+
+---
+
+## Integration Patterns
+
+### Pattern 1: Single-Use Processing
+
+For occasional image processing:
+
+```go
+func ProcessImageOnce(imageData []byte) ([]byte, error) {
+    proc, err := processor.New(processor.Config{
+        ModelDir: "./models",
+    })
+    if err != nil {
+        return nil, err
+    }
+    defer proc.Close()
+    
+    result, err := proc.Upscale(imageData, processor.ProcessOptions{
+        TargetScale:  4,
+        OutputFormat: "png",
+    })
+    if err != nil {
+        return nil, err
+    }
+    
+    return result.Data, nil
+}
+```
+
+### Pattern 2: Application-Level Singleton
+
+For persistent processor instance (recommended):
+
+```go
+type App struct {
     processor *processor.Processor
 }
 
-func (cb *CoreBridge) Classify(imageData []byte) (string, error)
-func (cb *CoreBridge) Upscale(imageData []byte, imageType string, scale int) ([]byte, error)
-func (cb *CoreBridge) UpscaleToResolution(imageData []byte, width, height int, keepAspectRatio bool) ([]byte, error)
-func (cb *CoreBridge) AdjustAspectRatio(imageData []byte, targetWidth, targetHeight int) ([]byte, error)
-```
-
-## API Changes
-
-### New Methods
-
-#### `ClassifyImage(base64Data string) -> string`
-Classifies image as "anime" or "photo"
-```go
-classification, err := app.ClassifyImage(base64ImageData)
-// Returns: "anime" or "photo"
-```
-
-#### `UpscaleImage(base64Data, imageType string, scale int) -> string`
-Upscales image by specified factor (2x, 4x, etc.)
-```go
-upscaled, err := app.UpscaleImage(base64ImageData, "photo", 4)
-// Returns: base64 encoded upscaled image
-```
-
-#### `UpscaleToResolution(base64Data string, targetWidth, targetHeight int) -> string`
-Upscales to specific dimensions while maintaining aspect ratio
-```go
-upscaled, err := app.UpscaleToResolution(base64ImageData, 3840, 2160) // 4K
-// Returns: base64 encoded upscaled image
-```
-
-#### `AdjustAspectRatio(base64Data string, targetWidth, targetHeight int) -> string`
-Adjusts aspect ratio using intelligent seam carving
-```go
-adjusted, err := app.AdjustAspectRatio(base64ImageData, 1920, 1080) // 16:9
-// Returns: base64 encoded adjusted image
-```
-
-#### `ProcessImage(base64Data, targetResolution, useSeamCarving bool, targetAspectRatio string) -> string`
-Complete workflow: classify → adjust aspect → upscale
-```go
-result, err := app.ProcessImage(
-    base64ImageData, 
-    "4K", 
-    true, 
-    "16:9"
-)
-// 1. Auto-classify image
-// 2. Apply seam carving to 16:9 ratio
-// 3. Upscale to 4K (3840x2160)
-// Returns: base64 encoded final image
-```
-
-### Removed Methods
-
-- `UpscaleImage()` with fixed scale factor (replaced by `UpscaleToResolution`)
-- Direct access to Python bridge
-- Manual model selection
-
-## Setup Instructions
-
-### 1. Install SweetDesk-Core
-
-```bash
-# Option A: Use remote (recommended)
-go get github.com/pedro3pv/SweetDesk-core
-go mod tidy
-
-# Option B: Use local for development
-# Uncomment in go.mod:
-# replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core
-```
-
-### 2. Download Models
-
-Models are downloaded automatically on first run, or manually:
-
-```bash
-# Download all classification and upscaling models
-DOWNLOAD_ALL_PLATFORMS=false go generate ./...
-```
-
-### 3. Environment Variables
-
-```bash
-# Optional: Specify custom model directory (default: ./models)
-export SWEETDESK_MODEL_DIR="/path/to/models"
-
-# Optional: Specify ONNX Runtime library path
-# (uses embedded by default)
-export ONNX_LIB_PATH="/path/to/libonnxruntime.so"
-
-# Required for Pixabay integration
-export PIXABAY_API_KEY="your_api_key"
-```
-
-### 4. Build and Run
-
-```bash
-# Development
-wails dev
-
-# Production
-wails build
-```
-
-## Frontend Integration
-
-### Example: Complete Image Processing Workflow
-
-```javascript
-// Import Wails runtime
-import { Greet, ProcessImage } from './wails.js';
-
-async function processUserImage(imageFile) {
-    try {
-        // 1. Read image file
-        const fileContent = await imageFile.arrayBuffer();
-        const base64 = arrayBufferToBase64(fileContent);
-
-        // 2. Call backend with complete workflow
-        const result = await ProcessImage(
-            base64,
-            "4K",        // Target: 4K resolution
-            true,        // Enable seam carving
-            "16:9"       // Target aspect ratio
-        );
-
-        // 3. Display result
-        displayProcessedImage(result);
-    } catch (error) {
-        console.error('Processing failed:', error);
+func (a *App) startup(ctx context.Context) {
+    var err error
+    a.processor, err = processor.New(processor.Config{
+        ModelDir: "./models",
+    })
+    if err != nil {
+        fmt.Printf("Warning: processor init failed: %v\n", err)
+        a.processor = nil
     }
 }
 
-function arrayBufferToBase64(buffer) {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
+func (a *App) shutdown(ctx context.Context) {
+    if a.processor != nil {
+        a.processor.Close()
     }
-    return btoa(binary);
+}
+
+func (a *App) ProcessImage(base64Data string) (string, error) {
+    if a.processor == nil {
+        return "", fmt.Errorf("processor not available")
+    }
+    
+    // Process...
+    result, err := a.processor.Process(imageData, options)
+    // Return base64 encoded result...
 }
 ```
 
-## Performance Considerations
+### Pattern 3: Worker Pool
 
-### Image Size Recommendations
+For high-throughput processing:
 
-| Input Size | Processing Time | Output Quality |
-|-----------|-----------------|----------------|
-| 512×512   | 1-2s            | Excellent      |
-| 1024×1024 | 2-4s            | Excellent      |
-| 2048×2048 | 4-8s            | Very Good      |
-| 4096×4096 | 8-15s           | Good           |
+```go
+type ProcessorPool struct {
+    queue    chan ProcessTask
+    results  chan ProcessResult
+    workers  int
+    procs    []*processor.Processor
+}
 
-### Tiling
+func NewProcessorPool(size int) (*ProcessorPool, error) {
+    pool := &ProcessorPool{
+        queue:   make(chan ProcessTask, 10),
+        results: make(chan ProcessResult),
+        workers: size,
+        procs:   make([]*processor.Processor, size),
+    }
+    
+    // Initialize worker processors
+    for i := 0; i < size; i++ {
+        proc, err := processor.New(processor.Config{
+            ModelDir: "./models",
+        })
+        if err != nil {
+            return nil, err
+        }
+        pool.procs[i] = proc
+        
+        // Start worker
+        go pool.worker(proc)
+    }
+    
+    return pool, nil
+}
 
-SweetDesk-Core automatically tiles large images:
-- Default tile size: 512×512
-- Processed in parallel when available
-- Results stitched seamlessly
+func (p *ProcessorPool) worker(proc *processor.Processor) {
+    for task := range p.queue {
+        result, err := proc.Process(task.Data, task.Options)
+        p.results <- ProcessResult{
+            Result: result,
+            Error:  err,
+        }
+    }
+}
+```
+
+### Pattern 4: Caching Layer
+
+For repeated image processing:
+
+```go
+type CachedProcessor struct {
+    proc  *processor.Processor
+    cache map[string][]byte
+}
+
+func (cp *CachedProcessor) ProcessCached(imageHash string, imageData []byte, opts processor.ProcessOptions) ([]byte, error) {
+    // Check cache
+    if cached, ok := cp.cache[imageHash]; ok {
+        return cached, nil
+    }
+    
+    // Process
+    result, err := cp.proc.Process(imageData, opts)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Cache result
+    cp.cache[imageHash] = result.Data
+    
+    return result.Data, nil
+}
+```
+
+---
+
+## Error Handling
+
+### Graceful Degradation
+
+```go
+func (a *App) UpscaleImage(imageData []byte, scale int) ([]byte, error) {
+    if a.processor == nil {
+        // Fallback: return original image
+        fmt.Println("Warning: processor unavailable, returning original")
+        return imageData, nil
+    }
+    
+    result, err := a.processor.Upscale(imageData, processor.ProcessOptions{
+        TargetScale:  scale,
+        OutputFormat: "png",
+    })
+    
+    if err != nil {
+        // Log error but don't crash
+        fmt.Printf("Upscaling failed: %v\n", err)
+        // Return original as fallback
+        return imageData, nil
+    }
+    
+    return result.Data, nil
+}
+```
+
+### Error Classification
+
+```go
+import "github.com/pedro3pv/SweetDesk-core/pkg/errors"
+
+result, err := proc.Process(imageData, options)
+if err != nil {
+    if errors.IsOutOfMemory(err) {
+        // Handle OOM: reduce image size or scale
+        log.Println("Out of memory, reducing image size")
+    } else if errors.IsModelNotFound(err) {
+        // Handle missing model: download or warn
+        log.Println("Model not found")
+    } else if errors.IsInvalidInput(err) {
+        // Handle invalid input: validate format/size
+        log.Println("Invalid image format")
+    } else {
+        // Generic error
+        log.Printf("Processing error: %v", err)
+    }
+}
+```
+
+---
+
+## Performance Optimization
+
+### Configuration Tuning
+
+```go
+config := processor.Config{
+    ModelDir:     "./models",
+    MaxWorkers:   4,              // Match CPU cores
+    CacheSize:    2000,           // Increase for batch processing
+    PixelLimit:   200 * 1024 * 1024, // 200MP max
+}
+
+proc, err := processor.New(config)
+```
+
+### Batch Processing
+
+```go
+func ProcessBatch(images [][]byte) ([][]byte, error) {
+    results := make([][]byte, len(images))
+    
+    for i, imageData := range images {
+        result, err := proc.Process(imageData, options)
+        if err != nil {
+            // Skip failed image
+            results[i] = imageData
+            continue
+        }
+        results[i] = result.Data
+    }
+    
+    return results, nil
+}
+```
+
+### GPU Acceleration
+
+```bash
+# Enable NVIDIA GPU
+export CUDA_VISIBLE_DEVICES=0
+
+# Or AMD GPU (ROCm)
+export HIP_VISIBLE_DEVICES=0
+
+# Application auto-detects and uses GPU
+```
+
+---
+
+## Debugging & Monitoring
+
+### Enable Debug Logging
+
+```bash
+export LOG_LEVEL=debug
+export DEBUG=true
+```
+
+### Performance Monitoring
+
+```go
+start := time.Now()
+result, err := proc.Process(imageData, options)
+duration := time.Since(start)
+
+log.Printf("Processing took %v (%d bytes/sec)",
+    duration,
+    len(imageData)*1000/duration.Milliseconds())
+```
+
+### Model Information
+
+```go
+info, err := proc.GetModelInfo()
+if err == nil {
+    log.Printf("Classifier: %s (v%s)", info.Classifier.Name, info.Classifier.Version)
+    log.Printf("Upscaler: %s (v%s)", info.Upscaler.Name, info.Upscaler.Version)
+    log.Printf("Total size: %.1f MB", info.TotalSizeMB)
+}
+```
+
+---
 
 ## Troubleshooting
 
-### Issue: "ONNX Runtime not found"
+### Common Issues
+
+#### 1. "Models not found"
 
 ```bash
-# Solution: Download embedded libraries
+# Download models
 go generate ./...
-go build
+
+# Or specify custom path
+export SWEETDESK_MODEL_DIR=/custom/path
 ```
 
-### Issue: Slow processing
+#### 2. "ONNX Runtime error"
 
 ```bash
-# Check if hardware acceleration is available
-export CUDA_VISIBLE_DEVICES=0  # Linux/Windows with NVIDIA GPU
-# Or use CoreML on macOS (automatic)
+# Check library availability
+ldd /usr/lib/libonnxruntime.so  # Linux
+otool -L /usr/local/lib/libonnxruntime.dylib  # macOS
+
+# Specify path if needed
+export ONNX_LIB_PATH=/custom/path/libonnxruntime.so
 ```
 
-### Issue: Out of memory with large images
+#### 3. "Out of memory"
 
 ```bash
-# Enable system swap (Linux)
-sudo fallocate -l 4G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
+# Reduce concurrency
+export MAX_CONCURRENT_TASKS=1
+
+# Or process smaller images
+# Split large images before processing
 ```
 
-## Migration from Legacy
+#### 4. "Slow processing"
 
-If you have existing code using the old APIs:
+```bash
+# Enable GPU acceleration
+export CUDA_VISIBLE_DEVICES=0
 
-### Old API
-```go
-upscaledData, _ := app.upscaler.UpscaleImage(imageData, UpscaleOptions{
-    Model: "realesrgan-photo",
-    Scale: 4,
-})
+# Or increase workers
+export MAX_WORKERS=8
 ```
 
-### New API
-```go
-upscaled, _ := app.ProcessImage(
-    base64.StdEncoding.EncodeToString(imageData),
-    "4K",
-    false,
-    "",
-)
-```
+---
 
-## File Structure
+## Examples
 
-```
-SweetDesk/
-├── go.mod                              # Updated with SweetDesk-core
-├── go.sum
-├── app.go                              # Refactored with core processor
-├── main.go                             # Unchanged
-├── internal/
-│   └── services/
-│       ├── core_bridge.go              # NEW: Bridge adapter
-│       ├── image_processor.go          # Updated: Minimal changes
-│       ├── api_provider.go             # Unchanged: Pixabay
-│       └── python_bridge.go            # DEPRECATED: Can be removed
-├── frontend/                           # Unchanged
-└── models/                             # Downloaded on first run
-    ├── classifier/
-    │   └── classifier.onnx
-    ├── upscaler_anime/
-    │   ├── realcugan.onnx
-    │   └── ...
-    └── upscaler_photo/
-        ├── lsdir.onnx
-        └── ...
-```
+See `pkg/examples` in the repository for:
 
-## Future Improvements
+- Basic upscaling
+- Classification workflow
+- Batch processing
+- Error handling
+- GPU acceleration setup
 
-- [ ] GPU acceleration metrics dashboard
-- [ ] Batch processing API for multiple images
-- [ ] Custom model support
-- [ ] Real-time preview during processing
-- [ ] Progress callbacks for long operations
-- [ ] Model caching optimization
+---
+
+## API Stability
+
+- **Stable**: All methods marked as `Stable` won't change
+- **Beta**: Methods may change in minor versions
+- **Experimental**: May change anytime
+
+Check documentation for stability status.
+
+---
 
 ## Support
 
-For issues or questions:
-1. Check [SweetDesk-Core README](https://github.com/pedro3pv/SweetDesk-core)
-2. Review example in `pkg/examples`
-3. Open an issue on GitHub
+- [GitHub Issues](https://github.com/pedro3pv/SweetDesk-core/issues)
+- [Documentation](https://github.com/pedro3pv/SweetDesk-core/wiki)
+- [Discussions](https://github.com/pedro3pv/SweetDesk-core/discussions)
+
+---
 
 ## License
 
-Both projects use MIT License - see LICENSE files for details.
+SweetDesk-Core is MIT licensed. See LICENSE file for details.
