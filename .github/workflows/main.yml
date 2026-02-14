@@ -1,6 +1,5 @@
 name: Wails Build & Release (Bun)
 
-
 on:
   push:
     tags:
@@ -12,17 +11,14 @@ on:
         required: false
         type: string
 
-
 # Adicione permissões ao GITHUB_TOKEN
 permissions:
   contents: write
   packages: read
 
-
 env:
   NODE_OPTIONS: "--max-old-space-size=4096"
   BUN_VERSION: "1.1.13"
-
 
 jobs:
   build:
@@ -43,14 +39,12 @@ jobs:
             os: 'macos-latest'
             artifact: 'app-darwin-arm64'
 
-
     runs-on: ${{ matrix.build.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
 
       - name: Clone SweetDesk-core
         shell: bash
@@ -59,7 +53,6 @@ jobs:
           # Usa PAT_TOKEN para clonar repositório privado
           git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/pedro3pv/SweetDesk-core.git
           ls -la
-
 
       - name: Verify SweetDesk-core cloned
         shell: bash
@@ -70,7 +63,6 @@ jobs:
           fi
           echo "✅ SweetDesk-core found at ../SweetDesk-core"
           ls -la ../SweetDesk-core
-
 
       - name: Enable local SweetDesk-core replace directive
         shell: bash
@@ -83,12 +75,10 @@ jobs:
           fi
           cat go.mod | grep "replace"
 
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-
 
       - name: Clean and Install dependencies with Bun
         working-directory: frontend
@@ -107,13 +97,11 @@ jobs:
           # Adicionar tipos faltantes
           bun add -d @types/gensync
 
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
-
 
       - name: Install Linux dependencies
         if: matrix.build.os == 'ubuntu-latest'
@@ -123,10 +111,8 @@ jobs:
           # Criar symlink para webkit2gtk-4.0 apontar para 4.1
           sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc
 
-
       - name: Tidy Go modules
         run: go mod tidy
-
 
       - name: Generate code in SweetDesk-core
         shell: bash
@@ -136,18 +122,61 @@ jobs:
           cd ../SweetDesk-core
           go generate ./...
 
-
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
 
       - name: Install Garble (for obfuscation)
         run: go install mvdan.cc/garble@latest
 
-
       - name: Build Wails with Bun (Obfuscated)
         run: wails build -obfuscated -platform ${{ matrix.build.platform }}
 
+      - name: Verify and prepare macOS build
+        if: matrix.build.os == 'macos-latest'
+        run: |
+          echo "🔍 Verificando build do macOS..."
+          
+          # Encontrar o .app
+          APP_PATH=$(find build/bin -name "*.app" -type d -maxdepth 1 | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ Nenhum arquivo .app encontrado"
+            exit 1
+          fi
+          
+          echo "✅ Encontrado: $APP_PATH"
+          
+          # Verificar estrutura do bundle
+          if [ ! -d "$APP_PATH/Contents" ]; then
+            echo "❌ Estrutura do .app inválida (falta Contents/)"
+            exit 1
+          fi
+          
+          if [ ! -d "$APP_PATH/Contents/MacOS" ]; then
+            echo "❌ Estrutura do .app inválida (falta Contents/MacOS/)"
+            exit 1
+          fi
+          
+          if [ ! -f "$APP_PATH/Contents/Info.plist" ]; then
+            echo "❌ Estrutura do .app inválida (falta Contents/Info.plist)"
+            exit 1
+          fi
+          
+          echo "✅ Estrutura do bundle válida"
+          
+          # Listar estrutura
+          echo "📂 Estrutura do bundle:"
+          ls -lah "$APP_PATH/Contents/"
+          
+          # Remover atributos de quarentena
+          echo "🔓 Removendo atributos de quarentena..."
+          xattr -cr "$APP_PATH"
+          echo "✅ Atributos removidos"
+          
+          # Verificar permissões executáveis
+          echo "🔐 Verificando permissões..."
+          chmod +x "$APP_PATH/Contents/MacOS/"*
+          echo "✅ Permissões configuradas"
 
       - name: Remove quarantine attribute (macOS only)
         if: matrix.build.os == 'macos-latest'
@@ -156,14 +185,12 @@ jobs:
           find build/bin -name "*.app" -exec xattr -cr {} \;
           echo "✅ Atributos de quarentena removidos"
 
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.build.artifact }}
           path: |
             build/bin/*
-
 
   create-release:
     needs: build
@@ -175,20 +202,17 @@ jobs:
         with:
           fetch-depth: 0
 
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
-
 
       - name: Display structure of downloaded files
         run: |
           echo "📦 Estrutura dos arquivos baixados:"
           ls -laR release-artifacts/
 
-
-      - name: Prepare and ZIP release files
+      - name: Prepare and package release files
         run: |
           mkdir -p release-files
           
@@ -199,6 +223,10 @@ jobs:
             zip -r ../../release-files/SweetDesk-linux-amd64.zip ./*
             cd ../..
             echo "✅ SweetDesk-linux-amd64.zip criado"
+            
+            # Verificar integridade
+            echo "🔍 Verificando ZIP Linux..."
+            unzip -l release-files/SweetDesk-linux-amd64.zip | head -n 10
           fi
           
           # Windows: Criar ZIP com .exe
@@ -208,25 +236,70 @@ jobs:
             zip -r ../../release-files/SweetDesk-windows-amd64.zip ./*
             cd ../..
             echo "✅ SweetDesk-windows-amd64.zip criado"
+            
+            # Verificar integridade
+            echo "🔍 Verificando ZIP Windows..."
+            unzip -l release-files/SweetDesk-windows-amd64.zip | head -n 10
           fi
           
-          # macOS: Criar ZIP com .app (preservando permissões e symlinks)
+          # macOS: Criar TAR.GZ preservando symlinks e permissões
           if [ -d "release-artifacts/app-darwin-arm64" ]; then
-            echo "📦 Criando ZIP para macOS..."
+            echo "📦 Criando TAR.GZ para macOS..."
+            
+            # Encontrar o arquivo .app
+            APP_PATH=$(find release-artifacts/app-darwin-arm64 -name "*.app" -type d -maxdepth 1 | head -n 1)
+            
+            if [ -z "$APP_PATH" ]; then
+              echo "❌ Nenhum arquivo .app encontrado"
+              ls -la release-artifacts/app-darwin-arm64/
+              exit 1
+            fi
+            
+            APP_NAME=$(basename "$APP_PATH")
+            echo "✅ Encontrado: $APP_NAME"
+            
+            # Verificar estrutura do bundle antes de empacotar
+            if [ ! -d "$APP_PATH/Contents" ]; then
+              echo "❌ Estrutura do .app inválida (falta Contents/)"
+              exit 1
+            fi
+            
+            if [ ! -d "$APP_PATH/Contents/MacOS" ]; then
+              echo "❌ Estrutura do .app inválida (falta Contents/MacOS/)"
+              exit 1
+            fi
+            
+            echo "✅ Estrutura do bundle válida"
+            
+            # Criar TAR.GZ preservando symlinks, permissões e metadata
             cd release-artifacts/app-darwin-arm64
-            # Usar ditto para preservar estrutura do .app corretamente
-            zip -ry ../../release-files/SweetDesk-darwin-arm64.zip ./*
+            tar -czf ../../release-files/SweetDesk-darwin-arm64.tar.gz "$APP_NAME"
             cd ../..
-            echo "✅ SweetDesk-darwin-arm64.zip criado"
+            
+            echo "✅ SweetDesk-darwin-arm64.tar.gz criado"
+            
+            # Verificar integridade do TAR.GZ
+            echo "🔍 Verificando TAR.GZ macOS..."
+            tar -tzf release-files/SweetDesk-darwin-arm64.tar.gz | grep -E "(Contents/MacOS|Contents/Info.plist)" | head -n 5
+            
+            if tar -tzf release-files/SweetDesk-darwin-arm64.tar.gz | grep -q "Contents/MacOS"; then
+              echo "✅ Estrutura do bundle preservada no arquivo"
+            else
+              echo "⚠️ AVISO: Estrutura do bundle pode estar incorreta"
+            fi
+            
+            # Verificar se symlinks foram preservados
+            if tar -tzf release-files/SweetDesk-darwin-arm64.tar.gz | grep -q "Frameworks"; then
+              echo "✅ Frameworks encontrados no arquivo"
+            fi
           fi
           
           echo ""
           echo "📋 Arquivos preparados para release:"
           ls -lah release-files/
           echo ""
-          echo "📊 Tamanho dos ZIPs:"
-          du -h release-files/*.zip
-
+          echo "📊 Tamanho dos arquivos:"
+          du -h release-files/*
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -242,18 +315,45 @@ jobs:
             |----------|------|------------|
             | 🐧 Linux (x64) | `SweetDesk-linux-amd64.zip` | Extrair e executar |
             | 🪟 Windows (x64) | `SweetDesk-windows-amd64.zip` | Extrair e executar .exe |
-            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64.zip` | Extrair e mover para Aplicativos |
+            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64.tar.gz` | Extrair e mover para Aplicativos |
             
             ### ⚠️ Nota para usuários macOS
             
-            Se você receber o erro "O aplicativo não pode ser aberto":
+            **Após extrair o arquivo `.tar.gz`:**
             
-            1. Abra o Terminal
-            2. Execute: `xattr -cr /caminho/para/SweetDesk.app`
-            3. Ou: Clique com botão direito no app → Abrir → Abrir
+            1. **Extrair o arquivo:**
+               ```bash
+               tar -xzf SweetDesk-darwin-arm64.tar.gz
+               ```
+            
+            2. **Mover para a pasta Aplicativos:**
+               ```bash
+               mv SweetDesk.app /Applications/
+               ```
+            
+            3. **Remover atributo de quarentena:**
+               ```bash
+               xattr -cr /Applications/SweetDesk.app
+               ```
+            
+            4. **Executar pela primeira vez:**
+               - Clique com botão direito no app → **Abrir** → **Abrir**
+               - Ou use o Launchpad normalmente após a primeira abertura
+            
+            **Se ainda aparecer "danificado":**
+            ```bash
+            sudo spctl --master-disable
+            sudo spctl --add --label "SweetDesk" /Applications/SweetDesk.app
+            sudo spctl --master-enable
+            ```
+            
+            ### 🐛 Problemas conhecidos
+            
+            - **macOS Gatekeeper**: Apps não assinados podem exibir avisos de segurança na primeira execução
+            - **Solução permanente**: Use os comandos acima para adicionar exceção
             
             ### 📝 Changelog
-          files: release-files/*.zip
+          files: release-files/*
           generate_release_notes: true
           draft: false
           prerelease: false
