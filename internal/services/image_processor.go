@@ -6,12 +6,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image"
+	_ "image/gif"
 	"image/jpeg"
 	"image/png"
 	"log"
 	"os"
 	"path/filepath"
-	"strings" // ADDED: Required for containsSeparator
+	"strings"
 )
 
 // ImageProcessor handles all image processing operations
@@ -28,10 +29,6 @@ func NewImageProcessor(ctx context.Context) *ImageProcessor {
 
 // ProcessingOptions contains options for image processing
 type ProcessingOptions struct {
-	TargetResolution string // "4K", "5K", "8K"
-	AspectRatio      string // "16:9", "21:9", "auto"
-	UseSeamCarving   bool   // true for content-aware, false for crop
-	Quality          int    // JPEG quality (1-100)
 	TargetResolution string // "4K", "5K", "8K"
 	AspectRatio      string // "16:9", "21:9", "auto"
 	UseSeamCarving   bool   // true for content-aware, false for crop
@@ -154,6 +151,62 @@ func (ip *ImageProcessor) SaveToFile(data []byte, savePath string, fileName stri
 
 	log.Printf("✅ Image saved: %s", fullPath)
 	return fullPath, nil
+}
+
+// ValidateImage validates image format and size
+func (ip *ImageProcessor) ValidateImage(imageData []byte) error {
+	if len(imageData) == 0 {
+		return fmt.Errorf("empty image data")
+	}
+
+	// Try to decode to validate format
+	_, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return fmt.Errorf("invalid image format: %w", err)
+	}
+
+	return nil
+}
+
+// GetImageInfo returns image information
+func (ip *ImageProcessor) GetImageInfo(imageData []byte) (map[string]int, error) {
+	img, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	bounds := img.Bounds()
+	info := map[string]int{
+		"width":  bounds.Dx(),
+		"height": bounds.Dy(),
+	}
+
+	return info, nil
+}
+
+// ConvertFormat converts image between formats
+func (ip *ImageProcessor) ConvertFormat(imageData []byte, targetFormat string) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	var buf bytes.Buffer
+
+	switch targetFormat {
+	case "png":
+		err = png.Encode(&buf, img)
+	case "jpg", "jpeg":
+		err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
+	default:
+		err = png.Encode(&buf, img)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode image: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
 
 // containsSeparator checks if a string contains any path separator
