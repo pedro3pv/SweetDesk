@@ -67,10 +67,21 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize SweetDesk-core bridge
 	bridge, err := services.NewCoreBridge(ctx)
 	if err != nil {
-		log.Fatalf("Failed to initialize SweetDesk-core bridge: %v", err)
+		// Do not terminate the entire application if the bridge fails to initialize.
+		// Log the error and continue without the bridge (upscaling features disabled).
+		log.Printf("SweetDesk-core bridge disabled: failed to initialize: %v", err)
+
+		// Show a user-friendly warning dialog so the user understands that
+		// upscaling features will be unavailable until the bridge is configured.
+		_, _ = wailsRuntime.MessageDialog(ctx, wailsRuntime.MessageDialogOptions{
+			Type:    wailsRuntime.WarningDialog,
+			Title:   "Upscaling Unavailable",
+			Message: "SweetDesk-core bridge could not be initialized. Upscaling features will be unavailable.\n\nDetails: " + err.Error(),
+		})
+	} else {
+		a.coreBridge = bridge
+		fmt.Println("✅ SweetDesk-core bridge initialized")
 	}
-	a.coreBridge = bridge
-	fmt.Println("✅ SweetDesk-core bridge initialized")
 
 	// Get Pixabay API key from environment
 	a.pixabayKey = os.Getenv("PIXABAY_API_KEY")
