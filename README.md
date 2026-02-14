@@ -1,74 +1,121 @@
 # 🍬 SweetDesk
 
-> **Wallpapers em 4K automático para macOS** — Baixe, upscale e use em segundos.
+> **Aplicação desktop para upscaling inteligente de wallpapers** — De qualquer resolução para 4K usando IA.
 
 ![Version](https://img.shields.io/badge/version-0.0.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![macOS](https://img.shields.io/badge/macOS-11.0+-lightgrey)
-![Node](https://img.shields.io/badge/Node-18+-green)
+![Go](https://img.shields.io/badge/Go-1.25.7-00ADD8)
+![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)
 
 ---
 
 ## 📸 O Que É SweetDesk?
 
-**SweetDesk** é uma aplicação nativa de macOS que transforma wallpapers de **baixa/média resolução** em **imagens perfeitas em 4K (3840×2160)** usando **inteligência artificial**. O projeto utiliza o [**SweetDesk-core**](https://github.com/pedro3pv/SweetDesk-core) como engine de processamento, combinando upscaling inteligente, classificação automática e ajuste de aspect ratio.
+**SweetDesk** é uma aplicação desktop multiplataforma que transforma wallpapers de **baixa/média resolução** em **imagens 4K (3840×2160)** usando **inteligência artificial**. O projeto combina [**SweetDesk-core**](https://github.com/pedro3pv/SweetDesk-core) (motor de processamento em Go) com uma interface moderna em Next.js + React.
 
-### Principais Recursos:
+### Principais Recursos Implementados:
 
-✅ **Upscale Automático** — De qualquer resolução para 4K com AI (RealCUGAN + LSDIR)  
-✅ **Classificação Inteligente** — Detecta automaticamente anime vs fotografia  
-✅ **Content-Aware Crop** — Ajusta aspect ratio preservando conteúdo importante (Seam Carving)  
-✅ **Múltiplas Fontes** — Integração com Pixabay, Unsplash, Wallhaven  
-✅ **Interface macOS Nativa** — Design consistente com apps do sistema  
-✅ **Batch Processing** — Processa múltiplas imagens em background  
-✅ **Sem Perdas** — Upscale local no seu Mac (sem enviar para nuvem)  
-✅ **Dark/Light Mode** — Segue preferências do sistema  
-✅ **Aceleração por Hardware** — Suporte CoreML (Apple Silicon) e CUDA
+✅ **Upscale Automático** — De qualquer resolução para 4K/customizado com IA  
+✅ **Classificação Inteligente** — Detecta automaticamente anime vs fotografia (via SweetDesk-core)  
+✅ **Múltiplas Fontes** — Busca e download integrado com Pixabay  
+✅ **Batch Processing** — Processa múltiplas imagens em lote com progresso em tempo real  
+✅ **Interface Moderna** — Next.js 16 + React 19 + TailwindCSS  
+✅ **Processamento Local** — Todo upscale roda no seu computador (sem enviar para nuvem)  
+✅ **Cross-Platform** — macOS, Windows e Linux (via Wails)
 
 ---
 
-## 🚀 Começando Rápido
+## 🏗️ Arquitetura
+
+```
+┌─────────────────────────────────────────────┐
+│           Frontend (Next.js 16)             │
+│  React 19 + TypeScript + TailwindCSS        │
+│  - Busca de imagens (Pixabay)              │
+│  - Upload e preview                         │
+│  - Processamento batch                      │
+└──────────────┬──────────────────────────────┘
+               │ (Wails Bridge)
+               ↓
+┌─────────────────────────────────────────────┐
+│       Backend Go (Wails v2.11.0)            │
+│  - ImageProcessor                           │
+│  - CoreBridge (integração)                  │
+│  - API providers (Pixabay)                  │
+└──────┬──────────────────────────────────────┘
+       │
+       ↓
+┌─────────────────────────────────────────────┐
+│   SweetDesk-core v0.0.4 (Go Module)         │
+│   github.com/pedro3pv/SweetDesk-core        │
+│   - Classificação automática (anime/foto)   │
+│   - Upscaling (RealCUGAN / LSDIR)           │
+│   - Seam carving (aspect ratio)             │
+│   - ONNX Runtime embarcado                  │
+└─────────────────────────────────────────────┘
+```
+
+### Stack Técnico
+
+| Camada | Tecnologia | Versão | Propósito |
+|--------|-----------|--------|-----------|
+| **Frontend** | Next.js + React | 16.1.6 / 19.2.4 | Interface do usuário |
+| **UI Framework** | TailwindCSS | 4.1.18 | Estilização |
+| **Runtime** | Wails | 2.11.0 | App nativa multiplataforma |
+| **Backend** | Go | 1.25.7 | Lógica de negócios |
+| **Core Engine** | SweetDesk-core | 0.0.4 | Processamento de imagens |
+| **AI Runtime** | ONNX Runtime | 1.25.0 | Inferência de modelos |
+
+---
+
+## 🚀 Começando
 
 ### Pré-requisitos
 
-- **macOS 11.0+** (Big Sur ou superior)
-- **Apple Silicon (M1/M2/M3)** ou Intel x86-64
-- **4GB RAM mínimo** (8GB+ recomendado para upscaling de lotes)
-- **Node.js 18+** (se compilar do source)
+- **Go 1.25.7+**
+- **Node.js 18+** ou **Bun**
+- **Wails v2.11.0** ([Instalar Wails](https://wails.io/docs/gettingstarted/installation))
+- **4GB RAM mínimo** (8GB+ recomendado para batch processing)
 
-### Instalação
-
-#### Opção 1: Download DMG (Recomendado)
+### Instalação para Desenvolvimento
 
 ```bash
-# Baixe a última versão de Releases
-# https://github.com/Molasses-Co/SweetDesk/releases
-
-# Arraste SweetDesk.app para Applications
-# Abra Launchpad → SweetDesk
-```
-
-#### Opção 2: Homebrew
-
-```bash
-brew install molasses-co/sweetdesk/sweetdesk
-```
-
-#### Opção 3: Compilar do Source
-
-```bash
-# Clone o repositório
+# 1. Clone o repositório
 git clone https://github.com/Molasses-Co/SweetDesk.git
 cd SweetDesk
 
-# Instale dependências
-npm install
+# 2. Instale dependências do frontend
+cd frontend
+npm install  # ou: bun install / pnpm install
+cd ..
 
-# Build para macOS
-npm run build:mac
+# 3. Baixe dependências do Go
+go mod download
 
-# O app estará em dist/SweetDesk.app
-# Mova para Applications: cp -r dist/SweetDesk.app /Applications/
+# 4. Rode em modo desenvolvimento
+wails dev
+
+# O app abrirá com hot reload ativado
+```
+
+### Build para Produção
+
+```bash
+# Build para o sistema operacional atual
+wails build
+
+# Binário estará em: build/bin/
+```
+
+### Configuração da API Pixabay (Opcional)
+
+Para usar a busca de imagens integrada:
+
+```bash
+# Crie um arquivo .env na raiz do projeto
+echo "PIXABAY_API_KEY=sua_chave_aqui" > .env
+
+# Obtenha sua chave em: https://pixabay.com/api/docs/
 ```
 
 ---
@@ -80,192 +127,29 @@ npm run build:mac
 ```
 1️⃣  Abra SweetDesk
         ↓
-2️⃣  Cole URL de wallpaper OU selecione imagem local
+2️⃣  Escolha uma opção:
+    • Fazer upload de imagem local
+    • Buscar no Pixabay
         ↓
-3️⃣  Escolha resolução final (4K/5K/8K - padrão é 4K)
+3️⃣  Selecione resolução de saída (ex: 3840x2160)
         ↓
-4️⃣  App detecta: anime? foto? arte?
+4️⃣  Clique "Process"
         ↓
-5️⃣  Escolhe modelo de upscale automático
+5️⃣  Aguarde processamento (30s-2min)
         ↓
-6️⃣  Processa (30s-2min dependendo do tamanho)
-        ↓
-7️⃣  Preview do resultado
-        ↓
-8️⃣  "Set as Desktop" com 1 clique ✅
+6️⃣  Salve a imagem upscalada ✅
 ```
 
-### Exemplos de Uso
+### Processamento em Lote
 
-#### Cenário 1: Foto do Unsplash → 4K
-
+```bash
+1. Abra a aba "Batch"
+2. Adicione múltiplas imagens
+3. Configure resolução de saída
+4. Selecione pasta de destino
+5. Clique "Start Batch Processing"
+6. Acompanhe progresso em tempo real
 ```
-1. Abra SweetDesk
-2. Clique "Paste from Clipboard" (após copiar URL do Unsplash)
-3. Sistema detecta: "📷 Photo"
-4. Aplica: LSDIR (Real-ESRGAN 4x)
-5. Resultado: 3840×2160 em 4K puro
-6. Clique "Set as Wallpaper" → Done!
-```
-
-#### Cenário 2: Anime de Wallhaven → 4K
-
-```
-1. Abra SweetDesk
-2. Clique "Choose File" → selecione PNG anime
-3. Sistema detecta: "🎨 Anime"
-4. Aplica: RealCUGAN-pro (mantém linhas nítidas)
-5. Resultado: 3840×2160 com anime limpo
-6. Clique "Set as Wallpaper" → Done!
-```
-
-#### Cenário 3: Batch Processing (10+ imagens)
-
-```
-1. Crie pasta: ~/Pictures/ToUpscale
-2. Coloque 20 imagens lá
-3. Abra SweetDesk → "Batch Mode"
-4. Selecione ~/Pictures/ToUpscale
-5. Define output: ~/Pictures/Upscaled4K
-6. Deixe rodar em background (mostra progresso)
-7. Wallpapers aparecem em ~/Pictures/Upscaled4K
-```
-
----
-
-## 🎯 Funcionalidades Detalhadas
-
-### 1. **Detecção Automática (Anime vs Foto)**
-
-O app usa classificação baseada em IA para identificar o tipo de conteúdo:
-
-- **Foto**: Rua, natureza, retrato, objeto real
-  - **Modelo**: LSDIR (Real-ESRGAN 4x)
-  - **Melhor para**: Preservar detalhes, texturas naturais
-
-- **Anime**: Desenho, manga, ilustração
-  - **Modelo**: RealCUGAN-pro
-  - **Melhor para**: Manter linhas nítidas, cores vibrantes
-
-- **Arte Digital**: Renderização 3D, design, abstrato
-  - **Modelo**: Real-ESRGAN (UltraSharp)
-  - **Melhor para**: Aumentar definição, preservar cores
-
-### 2. **Upscaling de Resoluções**
-
-Você escolhe o **fator de escala**:
-
-| Tamanho Original | Escala | Resultado |
-|---|---|---|
-| 960×540 | 4x | **3840×2160** (4K) |
-| 1920×1080 | 2x | **3840×2160** (4K) |
-| 2560×1440 | 1.5x | **3840×2160** (4K) |
-| 2560×1600 | 1.5x | **3840×2400** (~4K ultrawide) |
-| 2560×1440 | 2x | **5120×2880** (5K) |
-
-**Nota**: Upscale 4x + resolução arbitrária = processamento mais longo.
-
-### 3. **Ajuste de Aspect Ratio (Content-Aware)**
-
-Se a imagem não for 16:9 exato, o SweetDesk pode:
-
-- **Crop (Rápido)**: Remove bordas, mantém centro
-- **Seam Carving (Inteligente)**: Expande/reduz sem distorcer conteúdo importante
-- **Pillar Box (Seguro)**: Adiciona fundo uniforme (menos comum)
-
-Exemplo:
-```
-Original: 3840×2400 (16:10)
-      ↓ (Seam Carving)
-Resultado: 3840×2160 (16:9)
-Conteúdo preservado, sem distorção
-```
-
-### 4. **Set as Wallpaper com 1 Clique**
-
-Após upscale:
-
-```
-Clique "Set as Wallpaper"
-    ↓
-SweetDesk salva em:
-~/Library/Application Support/SweetDesk/Wallpapers/
-    ↓
-Chama System Preferences via AppleScript
-    ↓
-Desktop & Screen Saver → Seleciona a imagem
-    ↓
-✅ Wallpaper aplicado em todos os desktops
-```
-
----
-
-## 🔧 Arquitetura Técnica
-
-```
-┌─────────────────────────────────────────────┐
-│           SweetDesk (Frontend)              │
-│  React + TypeScript + Electron/Tauri       │
-│  (UI, preview, file picker)                 │
-└──────────────┬──────────────────────────────┘
-               │
-               ↓
-┌─────────────────────────────────────────────┐
-│       Backend (Next.js API Route)           │
-│  Node.js + TypeScript                       │
-│  (Orquestração, classificação)              │
-└──────┬─────────────────────────────┬────────┘
-       │                             │
-       ↓                             ↓
-┌──────────────────┐    ┌─────────────────────────┐
-│  Classificador   │    │   SweetDesk-core (Go)   │
-│  (IA/ML)         │    │   Engine de Processing  │
-│  anime vs foto   │    │   - Upscaling (ONNX)    │
-└──────────────────┘    │   - RealCUGAN / LSDIR   │
-                        │   - Seam Carving        │
-                        │   - Tiling Automático   │
-                        └─────────┬───────────────┘
-                                  │
-                                  ↓
-                     ┌─────────────────────────┐
-                     │  ONNX Runtime           │
-                     │  (Bibliotecas embarcadas)│
-                     │  + CoreML/CUDA          │
-                     └─────────────────────────┘
-```
-
-### Stack Técnico
-
-| Layer | Tecnologia | Propósito |
-|-------|-----------|----------|
-| **Frontend** | React 18 + TypeScript | UI interativa |
-| **Runtime** | Electron ou Tauri | App nativa macOS |
-| **Backend** | Next.js 14 API Routes | Orquestração |
-| **Core Engine** | [SweetDesk-core](https://github.com/pedro3pv/SweetDesk-core) (Go) | Processamento de imagens |
-| **Upscaling** | ONNX Runtime + RealCUGAN/LSDIR | IA local, sem nuvem |
-| **Content-Aware** | Seam Carving | Ajuste inteligente |
-| **Aceleração** | CoreML (macOS) / CUDA | Hardware acceleration |
-| **Storage** | Sistema de arquivos local | Processamento offline |
-| **OS Integration** | AppleScript + Foundation | Set as Wallpaper |
-
-### Como Funciona o SweetDesk-core
-
-O [**SweetDesk-core**](https://github.com/pedro3pv/SweetDesk-core) é o motor de processamento escrito em Go que:
-
-1. **Embarca bibliotecas ONNX Runtime** no executável durante build
-2. **Classifica automaticamente** imagens (anime vs foto) usando modelos ML
-3. **Aplica upscaling** com modelos apropriados:
-   - **RealCUGAN**: Para anime/ilustrações
-   - **LSDIR**: Para fotografias realísticas
-4. **Processa em tiles** para imagens grandes (evita sobrecarga de memória)
-5. **Aplica seam carving** quando necessário ajustar aspect ratio
-6. **Acelera via hardware** usando CoreML (Apple Silicon) ou CUDA
-
-**Vantagens da Integração:**
-- ✅ **Sem downloads em runtime** — bibliotecas embarcadas
-- ✅ **Cross-platform** — suporta macOS (Intel + ARM), Linux e Windows
-- ✅ **Performance nativa** — escrito em Go com ONNX otimizado
-- ✅ **API pública** — reutilizável em outros projetos
 
 ---
 
@@ -273,281 +157,246 @@ O [**SweetDesk-core**](https://github.com/pedro3pv/SweetDesk-core) é o motor de
 
 ```
 SweetDesk/
-├── src/
-│   ├── components/          # React components (UI)
-│   │   ├── UploadZone.tsx
-│   │   ├── Preview.tsx
-│   │   ├── SettingsPanel.tsx
-│   │   └── BatchMode.tsx
-│   ├── pages/
-│   │   ├── api/
-│   │   │   ├── classify.ts        # Detecta anime vs foto
-│   │   │   ├── upscale.ts         # Chama SweetDesk-core
-│   │   │   ├── crop.ts            # Ajusta aspect ratio
-│   │   │   └── set-wallpaper.ts   # AppleScript bridge
-│   │   └── index.tsx              # Home page
-│   ├── lib/
-│   │   ├── core-integration.ts    # Wrapper para SweetDesk-core
-│   │   ├── classifier.ts          # Classificador de imagens
-│   │   └── macos-integration.ts   # AppleScript, System Prefs
-│   └── types/
-│       └── index.ts               # TypeScript types
-├── public/
-│   └── icons/                     # App icons (icns)
-├── scripts/
-│   ├── build-mac.sh               # Build para .dmg
-│   ├── download-core.sh           # Download SweetDesk-core binary
-│   └── setup-env.sh               # Setup inicial
-├── next.config.js
-├── tsconfig.json
-├── package.json
-└── README.md (este arquivo)
+├── frontend/                    # Next.js 16 + React 19
+│   ├── src/
+│   │   ├── app/                # App Router do Next.js
+│   │   ├── components/         # Componentes React
+│   │   │   ├── ImageUpload.tsx
+│   │   │   ├── ImagePreview.tsx
+│   │   │   ├── SearchPanel.tsx
+│   │   │   ├── DownloadList.tsx
+│   │   │   ├── ProcessingView.tsx
+│   │   │   ├── ProcessingPanel.tsx
+│   │   │   ├── FolderSelect.tsx
+│   │   │   ├── ImageDetail.tsx
+│   │   │   └── CompleteView.tsx
+│   │   └── lib/                # Utilitários
+│   ├── wailsjs/                # Bindings gerados pelo Wails
+│   ├── package.json
+│   ├── next.config.ts
+│   └── tailwind.config.ts
+│
+├── internal/                    # Backend Go
+│   └── services/
+│       ├── core_bridge.go      # Integração com SweetDesk-core
+│       ├── image_processor.go  # Processamento de imagens
+│       └── api_provider.go     # Pixabay API
+│
+├── app.go                       # Aplicação principal Wails
+├── main.go                      # Entry point
+├── go.mod                       # Dependências Go
+├── wails.json                   # Configuração Wails
+└── README.md
 ```
+
+---
+
+## 🎯 Funcionalidades Detalhadas
+
+### 1. Upscaling Inteligente
+
+O SweetDesk usa o [SweetDesk-core](https://github.com/pedro3pv/SweetDesk-core) que aplica automaticamente o modelo mais adequado:
+
+- **Fotos/Realismo**: LSDIR (Real-ESRGAN 4x)
+- **Anime/Ilustrações**: RealCUGAN-pro
+
+**Opções de Processamento:**
+
+```go
+type ProcessingOptions struct {
+    TargetWidth     int     // Largura final (ex: 3840)
+    TargetHeight    int     // Altura final (ex: 2160)
+    ScaleFactor     float64 // Fator de escala (ex: 4.0)
+    MaxResolution   int     // Limite máximo (padrão: 16384)
+    KeepAspectRatio bool    // Manter proporção
+}
+```
+
+### 2. Busca de Imagens (Pixabay)
+
+Interface integrada para buscar wallpapers:
+
+- Busca por palavras-chave
+- Filtros de resolução mínima
+- Preview antes do download
+- Download direto para processamento
+
+### 3. Processamento em Lote
+
+Sistema robusto para processar múltiplas imagens:
+
+- Adicione quantas imagens quiser
+- Progresso individual por imagem
+- Estados: `pending` → `processing` → `done` / `error`
+- Notificações em tempo real via Wails Events
+
+**Exemplo de uso interno:**
+
+```go
+items := []BatchItem{
+    {ID: "1", Base64Data: "...", Dimension: "3840x2160"},
+    {ID: "2", DownloadURL: "https://...", Dimension: "3840x2160"},
+}
+ProcessBatch(items, "/caminho/destino")
+```
+
+### 4. Seam Carving (via SweetDesk-core)
+
+Ajuste inteligente de aspect ratio que preserva conteúdo importante ao invés de apenas cortar/distorcer a imagem.
 
 ---
 
 ## ⚙️ Configuração Avançada
 
-### Modelos de Upscaling
-
-O SweetDesk-core gerencia automaticamente os modelos ONNX:
+### Variáveis de Ambiente
 
 ```bash
-# Modelos são embarcados no core ou baixados na primeira execução:
-- RealCUGAN-pro (anime)
-- LSDIR (fotografias)
-
-# Localização:
-~/.cache/sweetdesk/models/
+# .env (raiz do projeto)
+PIXABAY_API_KEY=sua_chave_aqui
 ```
 
-### Customizar Threshold de Classificação
+### Limites de Processamento
 
-Arquivo: `src/lib/classifier.ts`
+Configurados em `app.go`:
 
-```typescript
-const CLASSIFICATION_THRESHOLD = 0.7; // 0-1, default 0.7
-// Valores menores = mais sensível em detectar anime
+```go
+const (
+    defaultMaxResolution = 16384  // Máximo 16K
+    maxPixels = 16384 * 16384     // ~268 megapixels
+)
 ```
 
-### Ativar Debug Mode
+### Debug Mode
 
 ```bash
-# Terminal
+# Ativar logs detalhados
 export SWEETDESK_DEBUG=1
-open /Applications/SweetDesk.app
-
-# Mostra logs completos no console
+wails dev
 ```
 
-### Configurar Aceleração por Hardware
+---
 
-O SweetDesk-core automaticamente detecta e usa:
-- **CoreML** em Apple Silicon (M1/M2/M3)
-- **CUDA** em GPUs NVIDIA (se disponível)
-- **CPU** como fallback
+## 🔧 Desenvolvimento
 
-Para forçar CPU-only:
+### Rodar Frontend Isolado (Next.js)
+
 ```bash
-export SWEETDESK_FORCE_CPU=1
+cd frontend
+npm run dev
+# Abre em http://localhost:3000
 ```
 
----
+### Testar Backend
 
-## 🖥️ Sistema de Requisitos
+```bash
+# Rodar testes
+go test ./internal/services/...
 
-### Mínimo
-
-- macOS 11 Big Sur
-- 4GB RAM
-- 2GB espaço em disco (modelos + cache)
-- Processador com suporte a ONNX Runtime
-
-### Recomendado
-
-- macOS 13+ Ventura/Sonoma
-- Apple Silicon (M1/M2/M3+) ou Intel i7+
-- 16GB RAM
-- 5GB SSD (processamento mais rápido)
-
-### Performance por Hardware
-
-| Hardware | Upscale 4x (1080p→4K) | 2x (2K→4K) |
-|---|---|---|
-| M1 Pro | ~45s | ~20s |
-| M2 Max | ~35s | ~15s |
-| M3 Max | ~30s | ~12s |
-| Intel i9 (10th Gen) | ~60s | ~28s |
-
----
-
-## 🔒 Segurança & Privacidade
-
-✅ **Sem servidor externo** — Upscaling ocorre 100% localmente no seu Mac  
-✅ **Sem coleta de dados** — Nenhuma telemetria enviada  
-✅ **Open source** — Código auditável no GitHub  
-✅ **Modelos compactados** — ONNX Runtime otimizado
-
-**Armazenamento**:
-- Imagens temporárias: `~/Library/Application Support/SweetDesk/temp/` (limpas após uso)
-- Wallpapers finais: `~/Library/Application Support/SweetDesk/wallpapers/` (sua propriedade)
-- Modelos IA: `~/.cache/sweetdesk/models/` (somente leitura)
-- Cache do core: `./cache/onnxruntime/` (bibliotecas extraídas)
-
----
-
-## 📥 Integrações
-
-### Import de URLs
-
-Suporta direto:
-
-```
-✅ Unsplash.com (copie a URL de download)
-✅ Wallhaven.cc (download direto)
-✅ Pexels.com (download direto)
-✅ Pixabay.com (download direto)
-✅ Qualquer URL JPEG/PNG público
+# Testar CoreBridge
+go test -v ./internal/services -run TestCoreBridge
 ```
 
-**Exemplo**:
-```
-1. Unsplash → Imagem → Clique "Download" → Copy Link
-2. SweetDesk → Paste URL
-3. App baixa e processa
-```
+### Atualizar SweetDesk-core
 
-### Set as Wallpaper
+```bash
+# Atualizar para versão específica
+go get github.com/pedro3pv/SweetDesk-core@v0.0.5
 
-Integra com **System Preferences** via AppleScript:
+# Ou usar versão local para desenvolvimento
+# Edite go.mod e descomente:
+# replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core
 
-```applescript
-tell application "System Preferences"
-    activate
-    set current pane to pane id "com.apple.preference.desktopscreeneffect"
-    # E define a imagem no sistema
-end tell
-```
-
-### Batch Export
-
-Exporta para:
-
-```
-✅ Pasta local (~/Pictures/Upscaled4K/)
-✅ iCloud Drive (~/Library/Mobile Documents/)
+go mod tidy
 ```
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Problema: "App não abre no macOS Sonoma"
+### "CoreBridge not initialized"
+
+**Causa**: SweetDesk-core não foi carregado corretamente.
 
 **Solução**:
 ```bash
-# Remova quarentena (se fez download manual)
-xattr -d com.apple.quarantine /Applications/SweetDesk.app
+# Verificar se o módulo está baixado
+go mod download
+go mod verify
 
-# Ou: System Preferences → Security & Privacy → Allow SweetDesk
+# Rebuild o projeto
+wails build
 ```
 
-### Problema: Upscaling muito lento
-
-**Checklist**:
-1. Verificar RAM disponível
-2. Fechar apps pesados (Chrome, Photoshop, etc.)
-3. Apple Silicon usa CoreML automaticamente
-4. Tentar resolução menor (2K em vez de 4K)
-
-**Se lento demais**:
-```bash
-# Verificar se CoreML está ativo (Apple Silicon)
-# Ou usar resolução intermediária
-```
-
-### Problema: "Biblioteca embarcada não encontrada"
+### "Pixabay API key not configured"
 
 **Solução**:
 ```bash
-# Reinstalar o SweetDesk-core
-npm run download-core
-
-# Ou baixar manualmente:
-# https://github.com/pedro3pv/SweetDesk-core/releases
+# Criar arquivo .env na raiz
+echo "PIXABAY_API_KEY=sua_chave" > .env
 ```
 
-### Problema: "Set as Wallpaper" não funciona
+### Performance Lenta
 
-**Solução**:
-```bash
-# Verificar permissões AppleScript
-System Preferences → Privacy & Security → Automation
-    ↓
-Procure "SweetDesk" → Marque todas as permissões
-```
+**Dicas**:
+1. Usar resoluções intermediárias (2K ao invés de 8K)
+2. Processar lotes menores (5-10 imagens por vez)
+3. Fechar outros apps pesados
+4. SweetDesk-core usa automaticamente aceleração de hardware quando disponível
 
 ---
 
 ## 🤝 Contribuindo
 
-Adoramos contribuições! Aqui está como ajudar:
+Contribuições são bem-vindas! 
 
-### Setup Desenvolvimento
+### Como Contribuir
 
 ```bash
-# Clone e instale
-git clone https://github.com/Molasses-Co/SweetDesk.git
-cd SweetDesk
-npm install
+# 1. Fork o repositório
+# 2. Crie uma branch
+git checkout -b feature/minha-feature
 
-# Rode em dev mode
-npm run dev
+# 3. Commit suas mudanças
+git commit -m "feat: adiciona nova funcionalidade"
 
-# O app abre em Electron/Tauri com hot reload
+# 4. Push para o branch
+git push origin feature/minha-feature
+
+# 5. Abra um Pull Request
 ```
 
-### Estrutura de PR
+### Áreas que Precisam de Ajuda
 
-1. **Fork** o repo
-2. **Branch**: `git checkout -b feature/minha-feature`
-3. **Commit**: `git commit -m "Add: descrição clara"`
-4. **Push**: `git push origin feature/minha-feature`
-5. **PR**: Abra no GitHub com descrição
-
-### Áreas Procurando Help
-
-- [ ] Suporte a **Windows / Linux** (via SweetDesk-core)
-- [ ] Integração **Apple Shortcuts** (automação)
-- [ ] **Performance optimization** para Intel chips
-- [ ] Documentação em **outras linguagens** (pt-BR, es, ja, etc.)
-- [ ] **Testes unitários** (Jest + React Testing Library)
+- [ ] Integração com mais providers (Unsplash, Wallhaven)
+- [ ] Preset de resoluções comuns (1080p, 1440p, 4K, etc.)
+- [ ] Suporte a arrastar e soltar
+- [ ] Testes unitários do frontend
+- [ ] Documentação em outras línguas
 
 ---
 
 ## 📄 Licença
 
-**SweetDesk** é distribuído sob a **MIT License**.
+**MIT License** — Veja [LICENSE](./LICENSE) para detalhes.
 
-### Componentes e Dependências
+### Dependências
 
-| Componente | Licença | Comercial OK? | Notas |
-|---|---|---|---|
-| **SweetDesk-core** | MIT | ✅ Sim | Engine de processamento |
-| **ONNX Runtime** | MIT | ✅ Sim | Inferência de modelos |
-| **RealCUGAN** | MIT-like | ✅ Sim | Upscaling anime |
-| **LSDIR (Real-ESRGAN)** | BSD | ✅ Sim | Upscaling fotográfico |
-
-**IMPORTANTE**: Se você modificar ou redistribuir este software, **mantenha a licença MIT intacta** e inclua aviso de copyright.
+| Componente | Licença | Link |
+|-----------|---------|------|
+| SweetDesk-core | MIT | [GitHub](https://github.com/pedro3pv/SweetDesk-core) |
+| Wails | MIT | [wails.io](https://wails.io) |
+| Next.js | MIT | [nextjs.org](https://nextjs.org) |
+| ONNX Runtime | MIT | [onnxruntime.ai](https://onnxruntime.ai) |
+| RealCUGAN | BSD-3 | [GitHub](https://github.com/bilibili/ailab) |
 
 ---
 
 ## 🔗 Links Relacionados
 
-- **[SweetDesk-core](https://github.com/pedro3pv/SweetDesk-core)** — Engine de processamento (Go)
-- **[ONNX Runtime](https://github.com/microsoft/onnxruntime)** — Runtime de ML
-- **[RealCUGAN](https://github.com/bilibili/ailab)** — Upscaling de anime
-- **[LSDIR](https://github.com/cszn/LSDIR)** — Upscaling realístico
+- **[SweetDesk-core](https://github.com/pedro3pv/SweetDesk-core)** — Motor de processamento em Go
+- **[Wails](https://wails.io)** — Framework para apps desktop com Go
+- **[Next.js](https://nextjs.org)** — Framework React
+- **[Pixabay API](https://pixabay.com/api/docs/)** — API de imagens grátis
 
 ---
 
@@ -558,78 +407,54 @@ npm run dev
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Status do Projeto
 
-### v1.0 (Atual)
-- [x] Integração com SweetDesk-core
-- [x] Upscale 4K para foto/anime
-- [x] Classificação automática
-- [x] Set as Wallpaper integrado
-- [x] Batch processing básico
-- [x] Dark/Light mode
+### ✅ Implementado (v0.0.1)
 
-### v1.1 (Planejado)
-- [ ] Suporte a **5K/8K explícito**
-- [ ] **Color correction** pós-upscale
-- [ ] **Smart crop** com detecção de faces
-- [ ] **Multiple display setup** (diferentes resoluções por monitor)
-- [ ] **Scheduled wallpaper rotation** (trocar a cada hora/dia)
+- [x] Aplicação Wails com Next.js + React
+- [x] Integração com SweetDesk-core v0.0.4
+- [x] Upload de imagens locais
+- [x] Busca e download via Pixabay
+- [x] Upscaling individual (resolução customizável)
+- [x] Processamento em lote
+- [x] Progresso em tempo real
+- [x] Preview de imagens
 
-### v2.0 (Futuro)
-- [ ] **Windows & Linux** support (via SweetDesk-core)
-- [ ] **AI-powered wallpaper generation** (Text-to-Image)
-- [ ] **Wallpaper marketplace integrado** (Unsplash + Wallhaven APIs)
-- [ ] **Local AI model training** (seu próprio estilo)
-- [ ] **Cloud sync** (sincronizar wallpapers entre Macs)
+### 🚧 Em Desenvolvimento
+
+- [ ] Mais providers (Unsplash, Wallhaven)
+- [ ] Presets de resolução (1-click para 4K, 5K, etc.)
+- [ ] Histórico de processamentos
+- [ ] Configurações persistentes
+
+### 💡 Planejado para Futuras Versões
+
+- [ ] Modo "Set as Wallpaper" automático (macOS/Windows/Linux)
+- [ ] Suporte a múltiplos monitores
+- [ ] Rotação agendada de wallpapers
+- [ ] Color correction pós-upscale
+- [ ] Integração com serviços de nuvem
 
 ---
 
 ## 🎨 Créditos
 
-Desenvolvido por **[Molasses Co.](https://molasses.co)** com ❤️ para a comunidade macOS.
+Desenvolvido por **[@pedro3pv](https://github.com/pedro3pv)** para **[Molasses Co.](https://github.com/Molasses-Co)**
 
-### Agradecimentos Especiais
+### Agradecimentos
 
-- **Pedro Augusto ([@pedro3pv](https://github.com/pedro3pv))** — Desenvolvedor do SweetDesk-core
+- **SweetDesk-core** — Motor de processamento
 - **RealCUGAN Team** — Upscaling de anime
-- **LSDIR/Real-ESRGAN** — Upscaling fotográfico
-- **Microsoft ONNX Runtime** — Runtime de ML
-- **Tauri/Electron** — Framework nativo
-- **Community** — Feedback e PRs
+- **Real-ESRGAN/LSDIR** — Upscaling fotográfico
+- **Microsoft ONNX Runtime** — Inferência de ML
+- **Wails Team** — Framework desktop
+- **Vercel** — Next.js e React
 
 ---
 
-## 📖 Documentação Adicional
+**SweetDesk** — *Wallpapers em Alta Resolução com IA* 🍬✨
 
-- [**Quick Start Guide**](./docs/QUICKSTART.md)
-- [**Advanced Configuration**](./docs/ADVANCED.md)
-- [**Architecture Overview**](./docs/ARCHITECTURE.md)
-- [**Contributing Guide**](./CONTRIBUTING.md)
-- [**Changelog**](./CHANGELOG.md)
-
----
-
-## 📊 Status do Projeto
-
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
-
----
-
-## 🌟 Dê uma Star!
-
-Se SweetDesk foi útil, considere dar uma ⭐ no GitHub!
-
-```
-https://github.com/Molasses-Co/SweetDesk
-```
-
----
-
-**SweetDesk** — *Wallpapers Lindos em 4K, Automático* 🍬✨
-
-**Última atualização**: Fevereiro 2026  
 **Versão**: 0.0.1  
-**Mantenedor**: [@molassesco](https://github.com/Molasses-Co)  
-**Core Engine**: [SweetDesk-core](https://github.com/pedro3pv/SweetDesk-core) by [@pedro3pv](https://github.com/pedro3pv)
+**Última atualização**: Fevereiro 2026  
+**Mantenedor**: [@pedro3pv](https://github.com/pedro3pv)  
+**Core Engine**: [SweetDesk-core v0.0.4](https://github.com/pedro3pv/SweetDesk-core)
