@@ -358,16 +358,10 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 			}
 
 			// Save input to temp file
-			if a.coreBridge == nil {
-				a.procMu.Lock()
-				a.procStatus.Items[i].Status = "error"
-				a.procStatus.Items[i].Error = "core bridge not initialized"
-				a.procMu.Unlock()
-				a.emitProcessingStatus()
-				continue
+			tmpDir := ""
+			if a.coreBridge != nil {
+				tmpDir = a.coreBridge.TmpDir
 			}
-
-			tmpDir := a.coreBridge.TmpDir
 			if tmpDir == "" {
 				tmpDir = os.TempDir()
 			}
@@ -383,6 +377,16 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 			}
 			// Ensure temporary input file is cleaned up when processing is done
 			defer os.Remove(tmpInput)
+
+			// Check core bridge availability after temp file is created and deferred for cleanup
+			if a.coreBridge == nil {
+				a.procMu.Lock()
+				a.procStatus.Items[i].Status = "error"
+				a.procStatus.Items[i].Error = "core bridge not initialized"
+				a.procMu.Unlock()
+				a.emitProcessingStatus()
+				continue
+			}
 
 			tmpOutput := filepath.Join(savePath, fileName)
 

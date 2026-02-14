@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/pedro3pv/SweetDesk-core/pkg/processor"
 	"github.com/pedro3pv/SweetDesk-core/pkg/types"
@@ -66,13 +65,20 @@ func (cb *CoreBridge) ClassifyImage(imageData []byte) (types.ImageType, float32,
 	}
 
 	// SweetDesk-core Classify expects a file path, write to temp
-	tmpFile := filepath.Join(cb.TmpDir, "classify-input.png")
-	if err := os.WriteFile(tmpFile, imageData, 0644); err != nil {
+	// Use unique temp file to avoid race conditions with concurrent operations
+	tmpFile, err := os.CreateTemp(cb.TmpDir, "classify-*.png")
+	if err != nil {
+		return types.ImageTypeUnknown, 0, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	if err := os.WriteFile(tmpPath, imageData, 0644); err != nil {
 		return types.ImageTypeUnknown, 0, fmt.Errorf("failed to write temp file: %w", err)
 	}
-	defer os.Remove(tmpFile)
 
-	result, err := cb.processor.Classify(tmpFile)
+	result, err := cb.processor.Classify(tmpPath)
 	if err != nil {
 		return types.ImageTypePhoto, 0, fmt.Errorf("classification failed: %w", err)
 	}
@@ -87,19 +93,30 @@ func (cb *CoreBridge) UpscaleBytes(imageData []byte, opts *types.ProcessingOptio
 		return nil, fmt.Errorf("processor not initialized")
 	}
 
-	// Write input to temp file
-	tmpInput := filepath.Join(cb.TmpDir, "upscale-input.png")
+	// Create unique temp files to avoid race conditions with concurrent operations
+	tmpInputFile, err := os.CreateTemp(cb.TmpDir, "upscale-input-*.png")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create input temp file: %w", err)
+	}
+	tmpInput := tmpInputFile.Name()
+	tmpInputFile.Close()
+	defer os.Remove(tmpInput)
+
 	if err := os.WriteFile(tmpInput, imageData, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write input temp file: %w", err)
 	}
-	defer os.Remove(tmpInput)
 
-	// Output temp file
-	tmpOutput := filepath.Join(cb.TmpDir, "upscale-output.png")
+	// Create unique output temp file
+	tmpOutputFile, err := os.CreateTemp(cb.TmpDir, "upscale-output-*.png")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create output temp file: %w", err)
+	}
+	tmpOutput := tmpOutputFile.Name()
+	tmpOutputFile.Close()
 	defer os.Remove(tmpOutput)
 
 	// Process with options
-	_, err := cb.processor.ProcessWithOptions(tmpInput, tmpOutput, opts)
+	_, err = cb.processor.ProcessWithOptions(tmpInput, tmpOutput, opts)
 	if err != nil {
 		return nil, fmt.Errorf("upscaling failed: %w", err)
 	}
