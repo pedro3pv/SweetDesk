@@ -11,7 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings" // ADDED: Required for containsSeparator
+	"strings"
 )
 
 // ImageProcessor handles all image processing operations
@@ -28,10 +28,6 @@ func NewImageProcessor(ctx context.Context) *ImageProcessor {
 
 // ProcessingOptions contains options for image processing
 type ProcessingOptions struct {
-	TargetResolution string // "4K", "5K", "8K"
-	AspectRatio      string // "16:9", "21:9", "auto"
-	UseSeamCarving   bool   // true for content-aware, false for crop
-	Quality          int    // JPEG quality (1-100)
 	TargetResolution string // "4K", "5K", "8K"
 	AspectRatio      string // "16:9", "21:9", "auto"
 	UseSeamCarving   bool   // true for content-aware, false for crop
