@@ -5,15 +5,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+
+	"github.com/pedro3pv/SweetDesk-core/pkg/processor"
 )
 
 // App struct
 type App struct {
-	ctx            context.Context
-	imageProcessor *services.ImageProcessor
-	upscaler       *services.Upscaler
-	pythonBridge   *services.PythonBridge
-	pixabayKey     string
+	ctx              context.Context
+	coreProcessor    *processor.Processor
+	imageProcessor   *services.ImageProcessor
+	pixabayKey       string
 }
 
 // NewApp creates a new App application struct
@@ -26,15 +27,19 @@ func (a *App) startup(ctx context.Context) {
 	// Perform your setup here
 	a.ctx = ctx
 	
-	// Initialize services
-	a.imageProcessor = services.NewImageProcessor(ctx)
-	a.upscaler = services.NewUpscaler(ctx)
-	
-	// Initialize Python bridge (optional - may not be available)
-	bridge, err := services.NewPythonBridge(ctx)
-	if err == nil {
-		a.pythonBridge = bridge
+	// Initialize SweetDesk-core processor
+	var err error
+	a.coreProcessor, err = processor.New(processor.Config{
+		ModelDir: "./models",
+		ONNXLibPath: os.Getenv("ONNX_LIB_PATH"),
+	})
+	if err != nil {
+		fmt.Printf("⚠️  Warning: Failed to initialize SweetDesk-core: %v\n", err)
+		a.coreProcessor = nil
 	}
+	
+	// Initialize image processor for base64 conversions
+	a.imageProcessor = services.NewImageProcessor(ctx)
 	
 	// Get Pixabay API key from environment
 	a.pixabayKey = os.Getenv("PIXABAY_API_KEY")
@@ -54,7 +59,9 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 
 // shutdown is called at application termination
 func (a *App) shutdown(ctx context.Context) {
-	// Perform your teardown here
+	if a.coreProcessor != nil {
+		a.coreProcessor.Close()
+	}
 }
 
 // Greet returns a greeting for the given name
@@ -71,10 +78,10 @@ func (a *App) SearchImages(query string, page int, perPage int) ([]services.Imag
 	provider := services.NewPixabayProvider(a.ctx, a.pixabayKey)
 	
 	options := services.SearchOptions{
-		Page:    page,
-		PerPage: perPage,
-		MinWidth: 1920,
-		MinHeight: 1080,
+		Page:        page,
+		PerPage:     perPage,
+		MinWidth:    1920,
+		MinHeight:   1080,
 		Orientation: "horizontal",
 	}
 	
@@ -98,10 +105,10 @@ func (a *App) DownloadImage(imageURL string) (string, error) {
 	return a.imageProcessor.ConvertToBase64(data), nil
 }
 
-// ClassifyImage classifies an image as anime or photo
+// ClassifyImage classifies an image as anime or photo using SweetDesk-core
 func (a *App) ClassifyImage(base64Data string) (string, error) {
-	if a.pythonBridge == nil {
-		// Fallback to simple classification if Python not available
+	if a.coreProcessor == nil {
+		// Fallback to simple classification if core not available
 		return "photo", nil
 	}
 	
@@ -110,31 +117,34 @@ func (a *App) ClassifyImage(base64Data string) (string, error) {
 		return "", err
 	}
 	
-	result, err := a.pythonBridge.ClassifyImage(data)
+	result, err := a.coreProcessor.Classify(data)
 	if err != nil {
 		// Fallback
+		fmt.Printf("⚠️  Classification failed: %v\n", err)
 		return "photo", nil
 	}
 	
 	return result.Type, nil
 }
 
-// UpscaleImage upscales an image using AI
+// UpscaleImage upscales an image using SweetDesk-core AI engine
 func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (string, error) {
+	if a.coreProcessor == nil {
+		return "", fmt.Errorf("SweetDesk-core not initialized")
+	}
+	
 	data, err := a.imageProcessor.ConvertFromBase64(base64Data)
 	if err != nil {
 		return "", err
 	}
 	
-	model := a.upscaler.GetRecommendedModel(imageType)
-	
-	options := services.UpscaleOptions{
-		Model:  model,
-		Scale:  scale,
-		Format: "png",
+	options := processor.ProcessOptions{
+		ImageType:       imageType,
+		TargetScale:     scale,
+		OutputFormat:    "png",
 	}
 	
-	upscaled, err := a.upscaler.UpscaleImage(data, options)
+	upscaled, err := a.coreProcessor.Upscale(data, options)
 	if err != nil {
 		return "", err
 	}
@@ -142,67 +152,119 @@ func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (stri
 	return a.imageProcessor.ConvertToBase64(upscaled), nil
 }
 
-// ProcessImage is the main processing pipeline
-func (a *App) ProcessImage(base64Data string, targetResolution string, useSeamCarving bool) (string, error) {
-	// 1. Decode image
+// UpscaleToResolution upscales an image to a specific resolution
+func (a *App) UpscaleToResolution(base64Data string, targetWidth int, targetHeight int) (string, error) {
+	if a.coreProcessor == nil {
+		return "", fmt.Errorf("SweetDesk-core not initialized")
+	}
+	
+	data, err := a.imageProcessor.ConvertFromBase64(base64Data)
+	if err != nil {
+		return "", err
+	}
+	
+	options := processor.ProcessOptions{
+		TargetWidth:     targetWidth,
+		TargetHeight:    targetHeight,
+		KeepAspectRatio: true,
+		OutputFormat:    "png",
+	}
+	
+	upscaled, err := a.coreProcessor.UpscaleToResolution(data, options)
+	if err != nil {
+		return "", err
+	}
+	
+	return a.imageProcessor.ConvertToBase64(upscaled), nil
+}
+
+// AdjustAspectRatio adjusts image aspect ratio using seam carving
+func (a *App) AdjustAspectRatio(base64Data string, targetWidth int, targetHeight int) (string, error) {
+	if a.coreProcessor == nil {
+		return "", fmt.Errorf("SweetDesk-core not initialized")
+	}
+	
+	data, err := a.imageProcessor.ConvertFromBase64(base64Data)
+	if err != nil {
+		return "", err
+	}
+	
+	options := processor.ProcessOptions{
+		TargetWidth:     targetWidth,
+		TargetHeight:    targetHeight,
+		UseSeamCarving:  true,
+		OutputFormat:    "png",
+	}
+	
+	adjusted, err := a.coreProcessor.AdjustAspectRatio(data, options)
+	if err != nil {
+		return "", err
+	}
+	
+	return a.imageProcessor.ConvertToBase64(adjusted), nil
+}
+
+// ProcessImage is the main processing pipeline - complete workflow
+func (a *App) ProcessImage(base64Data string, targetResolution string, useSeamCarving bool, targetAspectRatio string) (string, error) {
+	if a.coreProcessor == nil {
+		return "", fmt.Errorf("SweetDesk-core not initialized")
+	}
+	
 	data, err := a.imageProcessor.ConvertFromBase64(base64Data)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
 	
-	// 2. Classify image
-	imageType := "photo"
-	if a.pythonBridge != nil {
-		result, err := a.pythonBridge.ClassifyImage(data)
-		if err == nil {
-			imageType = result.Type
+	// Parse target resolution
+	var targetWidth, targetHeight int
+	switch targetResolution {
+	case "4K":
+		targetWidth, targetHeight = 3840, 2160
+	case "1440p":
+		targetWidth, targetHeight = 2560, 1440
+	case "1080p":
+		targetWidth, targetHeight = 1920, 1080
+	case "720p":
+		targetWidth, targetHeight = 1280, 720
+	default:
+		targetWidth, targetHeight = 3840, 2160 // Default to 4K
+	}
+	
+	// If seam carving is requested, adjust aspect ratio first
+	if useSeamCarving && targetAspectRatio != "" {
+		options := processor.ProcessOptions{
+			TargetAspectRatio: targetAspectRatio,
+			UseSeamCarving:    true,
+			OutputFormat:      "png",
+		}
+		
+		data, err = a.coreProcessor.AdjustAspectRatio(data, options)
+		if err != nil {
+			return "", fmt.Errorf("aspect ratio adjustment failed: %w", err)
 		}
 	}
 	
-	// 3. Upscale image
-	model := a.upscaler.GetRecommendedModel(imageType)
-	scale := 4 // Default to 4x for 4K
-	
-	options := services.UpscaleOptions{
-		Model:  model,
-		Scale:  scale,
-		Format: "png",
+	// Classify image
+	classifyOptions := processor.ProcessOptions{OutputFormat: "png"}
+	classifyResult, err := a.coreProcessor.ClassifyWithOptions(data, classifyOptions)
+	imageType := "photo" // default fallback
+	if err == nil {
+		imageType = classifyResult.Type
 	}
 	
-	upscaled, err := a.upscaler.UpscaleImage(data, options)
+	// Upscale to target resolution
+	upscaleOptions := processor.ProcessOptions{
+		ImageType:       imageType,
+		TargetWidth:     targetWidth,
+		TargetHeight:    targetHeight,
+		KeepAspectRatio: true,
+		OutputFormat:    "png",
+	}
+	
+	upscaled, err := a.coreProcessor.UpscaleToResolution(data, upscaleOptions)
 	if err != nil {
-		return "", fmt.Errorf("failed to upscale: %w", err)
+		return "", fmt.Errorf("upscaling failed: %w", err)
 	}
 	
-	// 4. Adjust aspect ratio if needed
-	if useSeamCarving && a.pythonBridge != nil {
-		// Get current dimensions
-		img, _, err := a.imageProcessor.LoadImageFromBytes(upscaled)
-		if err == nil {
-			bounds := img.Bounds()
-			currentWidth := bounds.Dx()
-			currentHeight := bounds.Dy()
-			
-			// Calculate target 16:9 dimensions
-			targetWidth := currentWidth
-			targetHeight := (currentWidth * 9) / 16
-			
-			if targetHeight != currentHeight {
-				seamOptions := services.SeamCarvingOptions{
-					TargetWidth:  targetWidth,
-					TargetHeight: targetHeight,
-					EnergyMode:   "forward",
-				}
-				
-				upscaled, err = a.pythonBridge.ApplySeamCarving(upscaled, seamOptions)
-				if err != nil {
-					// Fallback to original if seam carving fails
-					fmt.Printf("Seam carving failed: %v\n", err)
-				}
-			}
-		}
-	}
-	
-	// 5. Return result as base64
 	return a.imageProcessor.ConvertToBase64(upscaled), nil
 }
