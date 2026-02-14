@@ -16,7 +16,6 @@ permissions:
 
 env:
   NODE_OPTIONS: "--max-old-space-size=4096"
-  BUN_INSTALL: "./bun-install-cache"
   BUN_VERSION: "1.1.13"
 
 
@@ -86,10 +85,21 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
 
-      - name: Install dependencies with Bun
+      - name: Clean and Install dependencies with Bun
         working-directory: frontend
+        shell: bash
         run: |
-          bun install --frozen-lockfile
+          # Remove node_modules e cache customizado se existir
+          rm -rf node_modules
+          rm -rf ../bun-install-cache
+          
+          # Limpar cache do Bun
+          bun pm cache rm
+          
+          # Reinstalar sem cache customizado
+          bun install --no-cache
+          
+          # Adicionar tipos faltantes
           bun add -d @types/gensync
 
 
