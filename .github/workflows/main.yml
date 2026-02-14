@@ -154,27 +154,79 @@ jobs:
         with:
           name: ${{ matrix.build.artifact }}
           path: |
-            build/bin/SweetDesk*
-            build/bin/*.exe
-            build/bin/*.app
+            build/bin/*
 
 
   create-release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifacts
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+
+      - name: Display structure of downloaded files
+        run: |
+          echo "📦 Estrutura dos arquivos baixados:"
+          ls -laR release-artifacts/
+
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          
+          # Copiar e renomear arquivos Linux
+          if [ -d "release-artifacts/app-linux-amd64" ]; then
+            find release-artifacts/app-linux-amd64 -type f -name "SweetDesk*" -exec cp {} release-files/SweetDesk-linux-amd64 \;
+          fi
+          
+          # Copiar e renomear arquivos Windows
+          if [ -d "release-artifacts/app-windows-amd64.exe" ]; then
+            find release-artifacts/app-windows-amd64.exe -type f -name "*.exe" -exec cp {} release-files/SweetDesk-windows-amd64.exe \;
+          fi
+          
+          # Copiar e renomear arquivos macOS
+          if [ -d "release-artifacts/app-darwin-arm64" ]; then
+            find release-artifacts/app-darwin-arm64 -type f -name "*.app" -exec cp -r {} release-files/SweetDesk-darwin-arm64.app \;
+            # Se não encontrar .app, procurar binário
+            if [ ! -d "release-files/SweetDesk-darwin-arm64.app" ]; then
+              find release-artifacts/app-darwin-arm64 -type f -name "SweetDesk*" ! -name "*.app" -exec cp {} release-files/SweetDesk-darwin-arm64 \;
+            fi
+          fi
+          
+          echo "📋 Arquivos preparados para release:"
+          ls -lah release-files/
 
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            app-linux-amd64/*
-            app-windows-amd64/*
-            app-darwin-arm64/*
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Release ${{ github.event.inputs.tag || github.ref_name }}
+          body: |
+            ## 🎉 SweetDesk ${{ github.event.inputs.tag || github.ref_name }}
+            
+            ### 📦 Downloads
+            
+            | Platform | File |
+            |----------|------|
+            | 🐧 Linux (x64) | `SweetDesk-linux-amd64` |
+            | 🪟 Windows (x64) | `SweetDesk-windows-amd64.exe` |
+            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64` |
+            
+            ### 📝 Changelog
+          files: release-files/*
           generate_release_notes: true
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
