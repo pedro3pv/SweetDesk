@@ -244,7 +244,7 @@ const result = await window.go.main.App.MyFeature(input);
 
 ## 🔮 Future Roadmap
 
-### v0.1.0 (Next Release)
+### v0.0.1 (Next Release)
 - Download actual AI binaries
 - Implement "Set as Wallpaper"
 - Add batch processing

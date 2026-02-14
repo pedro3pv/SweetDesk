@@ -1,24 +1,150 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
-    --background: #ffffff;
-    --foreground: #171717;
+    /* Light mode - Purple theme */
+    --background: #f9fafb;
+    --foreground: #111827;
+    --card: #ffffff;
+    --card-foreground: #111827;
+    --muted: #f3f4f6;
+    --muted-foreground: #6b7280;
+    --border: #e5e7eb;
+    --input: #f3f4f6;
+    --primary: #a855f7;
+    --primary-foreground: #ffffff;
+    --secondary: #f3e8ff;
+    --secondary-foreground: #7e22ce;
+    --accent: #f59e0b;
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --ring: #a855f7;
+    --radius: 0.5rem;
+
+    /* New variables from shadcn/ui defaults */
+    --popover: #ffffff;
+    --popover-foreground: #111827;
+    --chart-1: #a855f7;
+    --chart-2: #06b6d4;
+    --chart-3: #f59e0b;
+    --chart-4: #6366f1;
+    --chart-5: #10b981;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #111827;
+    --sidebar-primary: #a855f7;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f3e8ff;
+    --sidebar-accent-foreground: #7e22ce;
+    --sidebar-border: #e5e7eb;
+    --sidebar-ring: #a855f7;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --background: #0a0a0a;
-        --foreground: #ededed;
-    }
+.dark {
+  /* Dark mode - Purple dark harmony */
+  --background: #1a1625;
+  --foreground: #f0f0f0;
+  --card: #2d1f3d;
+  --card-foreground: #f0f0f0;
+  --popover: #2d1f3d;
+  --popover-foreground: #f0f0f0;
+  --primary: #a855f7;
+  --primary-foreground: #ffffff;
+  --secondary: #3f0f5c;
+  --secondary-foreground: #f0f0f0;
+  --muted: #2d1f3d;
+  --muted-foreground: #b4a7c6;
+  --accent: #f59e0b;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #4a3361;
+  --input: #2d1f3d;
+  --ring: #a855f7;
+  --chart-1: #a855f7;
+  --chart-2: #06b6d4;
+  --chart-3: #f59e0b;
+  --chart-4: #6366f1;
+  --chart-5: #10b981;
+  --sidebar: #2d1f3d;
+  --sidebar-foreground: #f0f0f0;
+  --sidebar-primary: #a855f7;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #3f0f5c;
+  --sidebar-accent-foreground: #f0f0f0;
+  --sidebar-border: #4a3361;
+  --sidebar-ring: #a855f7;
 }
 
-@theme {
+@theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-ring: var(--ring);
+    --radius: var(--radius);
+
+    /* New shadcn/ui theme variables */
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
 }
 
-body {
-    color: var(--foreground);
-    background: var(--background);
-    font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Custom scrollbar (preserved from original code) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
 }
