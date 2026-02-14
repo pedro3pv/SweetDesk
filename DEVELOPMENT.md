@@ -1,382 +1,704 @@
-# SweetDesk Development Guide
+# Development Guidelines for SweetDesk
 
-## Getting Started
+## Table of Contents
 
-### Prerequisites
+1. [Project Structure](#project-structure)
+2. [Setup Environment](#setup-environment)
+3. [Build & Run](#build--run)
+4. [Code Guidelines](#code-guidelines)
+5. [Testing Strategy](#testing-strategy)
+6. [Debugging](#debugging)
+7. [Common Tasks](#common-tasks)
+8. [CI/CD Pipeline](#cicd-pipeline)
 
-1. **Go** (1.22+)
-   ```bash
-   # macOS
-   brew install go
-   
-   # Linux
-   sudo apt install golang-go
-   
-   # Windows
-   # Download from https://golang.org/dl/
-   ```
+---
 
-2. **Node.js** (18+)
-   ```bash
-   # macOS
-   brew install node
-   
-   # Linux
-   sudo apt install nodejs npm
-   
-   # Windows
-   # Download from https://nodejs.org/
-   ```
-
-3. **Wails CLI** (v2.11+)
-   ```bash
-   go install github.com/wailsapp/wails/v2/cmd/wails@latest
-   ```
-
-4. **Python** (3.8+)
-   ```bash
-   # Usually pre-installed on macOS/Linux
-   # Windows: Download from https://python.org/
-   
-   # Install dependencies
-   pip install -r python/requirements.txt
-   ```
-
-### Initial Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Molasses-Co/SweetDesk.git
-   cd SweetDesk
-   ```
-
-2. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your PIXABAY_API_KEY
-   ```
-
-3. **Install dependencies**
-   ```bash
-   # Frontend
-   cd frontend && npm install && cd ..
-   
-   # Go modules
-   go mod download
-   
-   # Python
-   pip install -r python/requirements.txt
-   ```
-
-4. **Download AI binaries** (optional for development)
-   ```bash
-   ./scripts/download-binaries.sh
-   ```
-
-### Development Mode
-
-Run the app in development mode with hot reload:
-
-```bash
-wails dev
-```
-
-This will:
-- Start the Go backend
-- Start the Next.js dev server
-- Open the app window
-- Enable hot reload for both frontend and backend
-
-### Project Structure
+## Project Structure
 
 ```
 SweetDesk/
-├── main.go                      # Wails entry point
-├── app.go                       # Main app logic with Wails bindings
-├── internal/
-│   └── services/                # Business logic services
-│       ├── api_provider.go      # API integrations (Pixabay, etc.)
-│       ├── image_processor.go   # Image manipulation
-│       ├── python_bridge.go     # Python subprocess management
-│       └── upscaler.go          # AI upscaling logic
-├── frontend/
-│   ├── src/
-│   │   ├── app/                 # Next.js app directory
-│   │   └── components/          # React components
-│   ├── wailsjs/                 # Generated Wails bindings
-│   ├── package.json
-│   └── next.config.ts
-├── python/
-│   ├── classify_image.py        # Image classification
-│   ├── seam_carving.py          # Content-aware resize
-│   └── requirements.txt
-├── binaries/                    # AI upscaler binaries
-│   ├── darwin/
-│   ├── linux/
-│   └── windows/
-└── scripts/                     # Build and utility scripts
+├─ frontend/              # React/Vue UI (Wails frontend)
+│  ├─ src/
+│  │  ├─ components/   # React/Vue components
+│  │  ├─ pages/       # Page components
+│  │  ├─ services/    # API calls (Wails bindings)
+│  │  ├─ hooks/       # Custom React hooks
+│  │  ├─ styles/      # CSS/SCSS
+│  │  ├─ types/       # TypeScript types
+│  │  └─ App.tsx      # Main component
+│  ├─ package.json
+│  ├─ tsconfig.json
+│  └─ vite.config.js
+├─ cmd/app/              # Wails app entrypoint
+│  └─ main.go            # Bootstrap & configuration
+├─ internal/              # Private Go packages
+│  ├─ app.go              # App struct & lifecycle
+│  ├─ handlers/           # API handlers
+│  │  ├─ image.go        # Image processing endpoints
+│  │  ├─ upscale.go      # Upscaling endpoints
+│  │  ├─ pixabay.go      # Pixabay API endpoints
+│  │  └─ process.go      # Full pipeline endpoints
+│  ├─ services/          # Business logic
+│  │  ├─ image.go        # Image utilities
+│  │  ├─ cache.go        # Caching layer
+│  │  └─ pixabay.go      # Pixabay client
+│  ├─ models/             # Data models
+│  │  ├─ image.go
+│  │  ├─ config.go
+│  │  └─ result.go
+│  └─ utils/              # Utilities
+│     ├─ logger.go
+│     ├─ errors.go
+│     └─ constants.go
+├─ pkg/                   # Public packages (if any)
+│  └─ examples/            # Example implementations
+├─ models/                # ML model files
+│  ├─ classifier/
+│  └─ upscaler/
+├─ go.mod
+├─ go.sum
+├─ wails.json            # Wails configuration
+├─ .env.example          # Environment variables template
+├─ .github/
+│  ├─ workflows/
+│  │  ├─ test.yml       # Automated tests
+│  │  ├─ build.yml      # Build binaries
+│  │  └─ release.yml    # Release artifacts
+│  └─ ISSUE_TEMPLATE/
+├─ README.md
+├─ MIGRATION_GUIDE.md     # From legacy to SweetDesk-core
+└─ DEVELOPMENT.md         # This file
 ```
 
-## Development Workflow
+---
 
-### Adding a New Feature
+## Setup Environment
 
-1. **Backend (Go)**
-   - Add method to `app.go`
-   - Methods will be auto-exposed to frontend via Wails
-   - Example:
-   ```go
-   func (a *App) MyNewFeature(param string) (string, error) {
-       // Your logic here
-       return "result", nil
-   }
-   ```
+### Prerequisites
 
-2. **Frontend (React/TypeScript)**
-   - Use Wails bindings:
-   ```typescript
-   const result = await window.go.main.App.MyNewFeature("param");
-   ```
-   - Create components in `frontend/src/components/`
-   - Add pages in `frontend/src/app/`
+- **Go 1.21+** - Backend language
+- **Node.js 18+** - Frontend build
+- **npm or yarn** - Package management
+- **Wails v2.11+** - Desktop framework
+- **Git** - Version control
 
-3. **Testing**
-   - Run in dev mode: `wails dev`
-   - Test functionality
-   - Check console for errors
-
-### Adding a New API Provider
-
-1. Create a new provider in `internal/services/api_provider.go`:
-   ```go
-   type UnsplashProvider struct {
-       apiKey string
-       client *http.Client
-       ctx    context.Context
-   }
-   
-   func (p *UnsplashProvider) Search(...) ([]ImageResult, error) {
-       // Implementation
-   }
-   ```
-
-2. Update `app.go` to support the new provider
-
-3. Update frontend to show provider selection
-
-### Working with Python Scripts
-
-The Python scripts are called via subprocess. To debug:
-
-1. Test scripts directly:
-   ```bash
-   python python/classify_image.py path/to/image.jpg
-   ```
-
-2. Check output format (should be valid JSON)
-
-3. Ensure scripts are executable:
-   ```bash
-   chmod +x python/*.py
-   ```
-
-## Building for Production
-
-### Single Platform
+### macOS Setup
 
 ```bash
-# macOS
-wails build -platform darwin/universal
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Linux
-wails build -platform linux/amd64
+# Install dependencies
+brew install go node wails
 
-# Windows (cross-compile from Linux/macOS)
-wails build -platform windows/amd64
+# Verify installation
+go version  # Go 1.21+
+node -v    # Node 18+
+wails version
 ```
 
-### All Platforms
+### Linux Setup (Ubuntu/Debian)
 
 ```bash
-./scripts/build-all-platforms.sh
+# Install dependencies
+sudo apt-get update
+sudo apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev
+
+# Install Go
+wget https://go.dev/dl/go1.21.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.21.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+
+# Install Node.js
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install Wails
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
 ```
 
-Output locations:
-- macOS: `build/bin/SweetDesk.app`
-- Linux: `build/bin/SweetDesk`
-- Windows: `build/bin/SweetDesk.exe`
+### Windows Setup
+
+```powershell
+# Using Chocolatey
+choco install golang nodejs wails-cli
+
+# Or manual installation
+# 1. Download Go from https://go.dev/dl/
+# 2. Download Node.js from https://nodejs.org/
+# 3. Install Wails: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+```
+
+### Clone & Configure
+
+```bash
+# Clone repository
+git clone https://github.com/Molasses-Co/SweetDesk.git
+cd SweetDesk
+
+# Copy environment configuration
+cp .env.example .env
+
+# Add your Pixabay API key
+# Edit .env and set PIXABAY_API_KEY=your_key_here
+
+# Install dependencies
+go mod download
+cd frontend && npm install && cd ..
+
+# Download ML models (if not committed)
+go generate ./...
+```
+
+---
+
+## Build & Run
+
+### Development Mode
+
+```bash
+# Start development server (hot reload)
+wails dev
+
+# The app will:
+# - Open browser at http://localhost:34115
+# - Hot reload on frontend changes
+# - Restart on backend changes (Go files)
+```
+
+### Production Build
+
+```bash
+# Build optimized binary
+wails build -o SweetDesk
+
+# Output locations:
+# - macOS: ./build/bin/SweetDesk.app/Contents/MacOS/SweetDesk
+# - Linux: ./build/bin/SweetDesk
+# - Windows: ./build/bin/SweetDesk.exe
+```
+
+### Frontend-only Development
+
+```bash
+# If you want to develop frontend without Wails
+cd frontend
+npm run dev
+
+# Runs on http://localhost:5173
+# (Note: Backend APIs won't work in this mode)
+```
+
+### Backend-only Testing
+
+```bash
+# Test Go packages
+go test ./...
+
+# Test with coverage
+go test -cover ./...
+
+# Test specific package
+go test ./internal/handlers/...
+```
+
+---
+
+## Code Guidelines
+
+### Go Code Style
+
+#### Naming Conventions
+
+```go
+// Package names: lowercase, no underscores
+package handlers
+
+// Exported (public): PascalCase
+func (a *App) ProcessImage(data []byte) error { }
+
+// Unexported (private): camelCase
+func (a *App) validateInput(data []byte) bool { }
+
+// Constants: ALL_CAPS for unexported, PascalCase for exported
+const (
+    maxImageSize = 100 * 1024 * 1024  // 100MB
+    defaultScale = 4
+)
+
+const (
+    MaxConcurrency = 4
+)
+
+// Variables: camelCase
+var processingQueue = make(chan Task, 10)
+```
+
+#### Error Handling
+
+```go
+// Always check errors
+data, err := ioutil.ReadFile(filename)
+if err != nil {
+    return fmt.Errorf("failed to read file: %w", err)
+}
+
+// Wrap with context
+result, err := a.coreProcessor.Process(data, options)
+if err != nil {
+    return fmt.Errorf("processing failed: %w", err)
+}
+
+// Log and return early
+if err := validate(input); err != nil {
+    logger.Error("validation failed", err)
+    return nil, err
+}
+```
+
+#### Function Structure
+
+```go
+// 1. Receiver (if method)
+func (a *App) Method() error {
+
+// 2. Validate inputs early
+    if a.coreProcessor == nil {
+        return fmt.Errorf("core processor not initialized")
+    }
+    
+// 3. Acquire resources
+    defer func() {
+        // Cleanup if needed
+    }()
+    
+// 4. Main logic
+    result := process(data)
+    
+// 5. Return results
+    return nil
+}
+```
+
+### Frontend Code Style
+
+#### React Components
+
+```typescript
+// Use functional components with hooks
+interface ImageCardProps {
+  imageUrl: string;
+  onUpscale: (scale: number) => void;
+}
+
+const ImageCard: React.FC<ImageCardProps> = ({ imageUrl, onUpscale }) => {
+  const [isLoading, setIsLoading] = React.useState(false);
+  
+  const handleUpscale = async (scale: number) => {
+    setIsLoading(true);
+    try {
+      await onUpscale(scale);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  return (
+    <div className="image-card">
+      <img src={imageUrl} alt="Preview" />
+      <button onClick={() => handleUpscale(4)} disabled={isLoading}>
+        Upscale 4x
+      </button>
+    </div>
+  );
+};
+
+export default ImageCard;
+```
+
+#### Wails Service Integration
+
+```typescript
+// src/services/imageService.ts
+import * as wails from '@wailsjs/runtime';
+import { App } from '@wailsjs/go/main';
+
+export const imageService = {
+  async upscaleImage(base64: string, scale: number): Promise<string> {
+    try {
+      return await App.UpscaleImage(base64, "photo", scale);
+    } catch (error) {
+      console.error('Upscale failed:', error);
+      throw new Error(`Failed to upscale: ${error}`);
+    }
+  },
+
+  async processImage(base64: string, resolution: string): Promise<string> {
+    try {
+      return await App.ProcessImage(base64, resolution, true, "16:9");
+    } catch (error) {
+      console.error('Processing failed:', error);
+      throw new Error(`Failed to process: ${error}`);
+    }
+  },
+};
+```
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+
+```bash
+# Run all tests
+go test ./...
+
+# Run with verbose output
+go test -v ./...
+
+# Run specific test
+go test -run TestProcessImage ./internal/handlers/
+
+# Generate coverage report
+go test -cover ./... > coverage.txt
+go tool cover -html=coverage.txt
+```
+
+### Test Structure
+
+```go
+// internal/handlers/image_test.go
+package handlers
+
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+)
+
+func TestUpscaleImage(t *testing.T) {
+    // Arrange
+    testData := []byte{/* PNG data */}
+    app := setupTestApp(t)
+    
+    // Act
+    result, err := app.UpscaleImage(testData, "photo", 4)
+    
+    // Assert
+    assert.NoError(t, err)
+    assert.NotEmpty(t, result)
+    assert.Greater(t, len(result), len(testData))
+}
+```
+
+### Integration Tests
+
+```bash
+# Run integration tests (slower, full pipeline)
+go test -tags integration ./...
+```
+
+### Frontend Tests (if added)
+
+```bash
+cd frontend
+npm test                    # Run tests
+npm run test:coverage       # Coverage report
+npm run test:watch          # Watch mode
+```
+
+---
 
 ## Debugging
 
-### Go Backend
+### Backend Debugging
 
-Add debug prints:
-```go
-fmt.Printf("Debug: %v\n", variable)
+#### VS Code Setup
+
+Create `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug SweetDesk",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/app",
+      "env": {
+        "PIXABAY_API_KEY": "your_key"
+      },
+      "args": []
+    }
+  ]
+}
 ```
 
-Or use the logger:
+Then press `F5` to start debugging.
+
+#### Console Logging
+
 ```go
+import "fmt"
 import "log"
-log.Printf("Debug: %v", variable)
+
+// Simple logging
+fmt.Printf("Debug: processing image %d bytes\n", len(data))
+
+// Structured logging
+log.Printf("[INFO] Upscaling: scale=%d\n", scale)
+
+// In production, use a proper logger
+// (e.g., github.com/sirupsen/logrus, go.uber.org/zap)
 ```
 
-### Frontend
+### Frontend Debugging
 
-Use browser dev tools:
-- In dev mode, press `Cmd+Option+I` (macOS) or `Ctrl+Shift+I` (Windows/Linux)
-- Check Console tab for errors
-- Use `console.log()` for debugging
+```typescript
+// Console logging
+console.log('Processing image:', imageData);
+console.error('Error occurred:', error);
 
-### Python Scripts
+// Browser DevTools
+// Press F12 to open DevTools
+// - Go to Console tab
+// - Set breakpoints
+// - Inspect network requests
 
-Add debug output to stderr:
-```python
-import sys
-print(f"Debug: {variable}", file=sys.stderr)
+// React DevTools
+// Install React DevTools extension
+// Inspect component hierarchy and state
 ```
 
-The Go backend will capture and log stderr output.
+---
 
-## Testing
+## Common Tasks
 
-### Manual Testing
+### Adding a New Image Processing Feature
 
-1. Start dev mode: `wails dev`
-2. Test each feature:
-   - Search images
-   - Upload image
-   - Process image
-   - Save result
+1. **Backend API Handler** (`internal/handlers/new_feature.go`):
 
-### Integration Testing
+```go
+func (a *App) NewFeature(base64Data string, params interface{}) (string, error) {
+    if a.coreProcessor == nil {
+        return "", fmt.Errorf("core processor not available")
+    }
+    
+    data, err := a.imageProcessor.ConvertFromBase64(base64Data)
+    if err != nil {
+        return "", err
+    }
+    
+    // Process
+    result, err := a.coreProcessor.NewFeature(data, params)
+    if err != nil {
+        return "", err
+    }
+    
+    return a.imageProcessor.ConvertToBase64(result), nil
+}
+```
 
-Test the full pipeline:
-1. Search for an image
-2. Select and download it
-3. Process with different options
-4. Verify output quality
+2. **Frontend Component** (`frontend/src/components/NewFeature.tsx`):
 
-## Common Issues
+```typescript
+const NewFeature: React.FC = () => {
+  const [result, setResult] = React.useState<string | null>(null);
+  
+  const handleProcess = async (image: string) => {
+    const res = await App.NewFeature(image, {});
+    setResult(res);
+  };
+  
+  return (
+    <div>
+      <button onClick={() => handleProcess(imageData)}>Process</button>
+      {result && <img src={`data:image/png;base64,${result}`} />}
+    </div>
+  );
+};
+```
 
-### "Python not found"
+3. **Test** (`internal/handlers/new_feature_test.go`):
 
-Install Python 3:
+```go
+func TestNewFeature(t *testing.T) {
+    app := setupTestApp(t)
+    testImage := getTestImage(t)
+    
+    result, err := app.NewFeature(testImage, nil)
+    
+    assert.NoError(t, err)
+    assert.NotEmpty(t, result)
+}
+```
+
+### Updating Dependencies
+
 ```bash
-# macOS
-brew install python3
+# Check for updates
+go list -u -m all
 
-# Linux
-sudo apt install python3
+# Update specific package
+go get -u github.com/package/name
 
-# Verify
-python3 --version
+# Update SweetDesk-core
+go get -u github.com/pedro3pv/SweetDesk-core
+
+# Tidy up
+go mod tidy
 ```
 
-### "Wails command not found"
+### Adding Environment Variables
 
-Install Wails CLI:
+1. Update `.env.example`:
+
 ```bash
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-# Ensure $GOPATH/bin is in your PATH
-export PATH=$PATH:$(go env GOPATH)/bin
+echo "NEW_VAR=value" >> .env.example
 ```
 
-### Frontend build errors
+2. Load in code:
 
-Clean and reinstall:
+```go
+var newVar = os.Getenv("NEW_VAR")
+if newVar == "" {
+    log.Fatal("NEW_VAR not set")
+}
+```
+
+---
+
+## CI/CD Pipeline
+
+### GitHub Actions Workflows
+
+#### Test Workflow (`.github/workflows/test.yml`)
+
+```yaml
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.21
+      - run: go test -v ./...
+```
+
+#### Build Workflow (`.github/workflows/build.yml`)
+
+```yaml
+name: Build
+
+on:
+  push:
+    tags: [v*]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+      - uses: actions/setup-node@v3
+      - run: wails build
+      - uses: actions/upload-artifact@v3
+        with:
+          name: SweetDesk-${{ matrix.os }}
+          path: build/bin/*
+```
+
+### Local Pre-commit Checks
+
 ```bash
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
-cd ..
+#!/bin/bash
+# .git/hooks/pre-commit
+
+# Format code
+gofmt -w ./...
+
+# Run tests
+go test ./... || exit 1
+
+# Check linting (if golangci-lint installed)
+golangci-lint run ./...
 ```
 
-### "Model not found" errors
+Install hook:
 
-Download the AI binaries:
 ```bash
-./scripts/download-binaries.sh
+chmod +x .git/hooks/pre-commit
 ```
 
-Or download manually from:
-- https://github.com/xinntao/Real-ESRGAN/releases
-- https://github.com/nihui/realcugan-ncnn-vulkan/releases
+---
 
 ## Performance Optimization
 
-### Backend
+### Profiling
 
-1. **Use goroutines for concurrent processing**
-   ```go
-   go processImage(image)
-   ```
+```bash
+# CPU profiling
+go test -cpuprofile=cpu.prof ./...
+go tool pprof cpu.prof
 
-2. **Implement caching** for API results
+# Memory profiling
+go test -memprofile=mem.prof ./...
+go tool pprof mem.prof
+```
 
-3. **Pool connections** for external services
+### Caching
 
-### Frontend
+```go
+// Cache classification results
+classificationCache := make(map[string]string)
 
-1. **Use React.memo** for expensive components
-2. **Lazy load** images
-3. **Debounce** search input
+func (a *App) ClassifyImageCached(hash string, data []byte) (string, error) {
+    if result, ok := classificationCache[hash]; ok {
+        return result, nil
+    }
+    
+    result, err := a.coreProcessor.Classify(data)
+    if err == nil {
+        classificationCache[hash] = result.Type
+    }
+    
+    return result.Type, err
+}
+```
 
-### Python
-
-1. **Use NumPy** for fast array operations
-2. **Consider Cython** for critical paths
-3. **Add GPU support** for intensive processing
-
-## Code Style
-
-### Go
-
-Follow standard Go conventions:
-- Use `gofmt` for formatting
-- Use meaningful variable names
-- Add comments for exported functions
-
-### TypeScript/React
-
-Follow React best practices:
-- Use functional components
-- Use TypeScript for type safety
-- Follow Next.js conventions
-
-### Python
-
-Follow PEP 8:
-- Use 4 spaces for indentation
-- Maximum line length: 88 (Black formatter)
-- Use type hints where appropriate
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-### PR Checklist
-
-- [ ] Code compiles without errors
-- [ ] Tests pass
-- [ ] Documentation updated
-- [ ] CHANGELOG.md updated
-- [ ] No console errors in dev mode
+---
 
 ## Resources
 
-- [Wails Documentation](https://wails.io/docs/introduction)
-- [Next.js Documentation](https://nextjs.org/docs)
+- [Wails Documentation](https://wails.io/docs/gettingstarted/firstproject)
 - [Go Documentation](https://golang.org/doc/)
-- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
-- [Pixabay API](https://pixabay.com/api/docs/)
+- [React Documentation](https://react.dev/)
+- [SweetDesk-Core Repository](https://github.com/pedro3pv/SweetDesk-core)
 
-## Support
+---
 
-- GitHub Issues: https://github.com/Molasses-Co/SweetDesk/issues
-- Discussions: https://github.com/Molasses-Co/SweetDesk/discussions
+## Getting Help
+
+1. Check existing [GitHub Issues](https://github.com/Molasses-Co/SweetDesk/issues)
+2. Review [README.md](./README.md) and [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)
+3. Open a new issue with:
+   - Description of the problem
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Environment details (OS, Go version, Node version)
+
+Happy coding! 🚀

@@ -32,6 +32,10 @@ type ProcessingOptions struct {
 	AspectRatio      string // "16:9", "21:9", "auto"
 	UseSeamCarving   bool   // true for content-aware, false for crop
 	Quality          int    // JPEG quality (1-100)
+	TargetResolution string // "4K", "5K", "8K"
+	AspectRatio      string // "16:9", "21:9", "auto"
+	UseSeamCarving   bool   // true for content-aware, false for crop
+	Quality          int    // JPEG quality (1-100)
 }
 
 // ProcessingResult contains the result of image processing

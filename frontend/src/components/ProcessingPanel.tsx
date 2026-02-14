@@ -45,6 +45,32 @@ export default function ProcessingPanel({
                 case '5K': targetWidth = 5120; targetHeight = 2880; break;
                 case '8K': targetWidth = 7680; targetHeight = 4320; break;
             }
+            // Step 1: Classify
+            setProgress('🔍 Classifying image type...');
+            // @ts-ignore
+            const imageType = await window.go.main.App.ClassifyImage(imageData);
+            
+            setProgress(`📊 Detected: ${imageType === 'anime' ? '🎨 Anime' : '📷 Photo'}`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Step 2: Upscale
+            setProgress('🚀 Upscaling to ' + targetResolution + '...');
+            const scale = targetResolution === '8K' ? 8 : targetResolution === '5K' ? 5 : 4;
+            
+            // @ts-ignore
+            const upscaled = await window.go.main.App.UpscaleImage(imageData, imageType, scale);
+            
+            setProgress('✨ Adjusting aspect ratio...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Step 3: Full processing
+            setProgress('🎨 Finalizing...');
+            // @ts-ignore
+            const result = await window.go.main.App.ProcessImage(
+                upscaled,
+                targetResolution,
+                useSeamCarving
+            );
 
             // Full processing (classification + upscale + adjustments in backend)
             const result = await ProcessImage(
@@ -80,6 +106,7 @@ export default function ProcessingPanel({
             {/* Resolution Selection */}
             <div className="mb-4">
                 <label className="block text-xs lg:text-sm font-medium text-purple-800 dark:text-purple-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Target Resolution
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -91,6 +118,10 @@ export default function ProcessingPanel({
                                 targetResolution === res
                                     ? 'bg-linear-to-r from-purple-500 to-indigo-600 text-white shadow-lg scale-105'
                                     : 'bg-purple-100 dark:bg-dark-surface text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/30 hover:scale-105'
+                            className={`py-2 px-4 rounded-lg font-medium transition-colors ${
+                                targetResolution === res
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                             }`}
                         >
                             {res}
@@ -101,6 +132,30 @@ export default function ProcessingPanel({
                     {targetResolution === '4K' && '3840 × 2160'}
                     {targetResolution === '5K' && '5120 × 2880'}
                     {targetResolution === '8K' && '7680 × 4320'}
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {targetResolution === '4K' && '3840 × 2160'}
+                    {targetResolution === '5K' && '5120 × 2880'}
+                    {targetResolution === '8K' && '7680 × 4320'}
+                </p>
+            </div>
+
+            {/* Aspect Ratio Method */}
+            <div className="mb-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={useSeamCarving}
+                        onChange={(e) => setUseSeamCarving(e.target.checked)}
+                        className="w-4 h-4 text-blue-500 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Use Content-Aware Resize (Seam Carving)
+                    </span>
+                </label>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-6">
+                    {useSeamCarving
+                        ? 'Intelligently preserves important content (slower)'
+                        : 'Fast center crop to target aspect ratio'}
                 </p>
             </div>
 
