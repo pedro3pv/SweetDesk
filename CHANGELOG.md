@@ -7,56 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-02-14
+
+### Changed
+- macOS build now outputs DMG instead of tar.gz for easier installation
+- Added ad-hoc codesigning for macOS builds to prevent "damaged app" errors
+- Updated GitHub Actions workflow for macOS DMG packaging using create-dmg
+
 ### Added
-- Complete application architecture with Wails + Next.js
-- Pixabay API integration for image search
-- Image upload via drag & drop or file picker
-- AI-powered image classification (anime vs photo detection)
-- AI upscaling using Real-ESRGAN and RealCUGAN models
-- Content-aware image resizing with seam carving
-- Fast center crop for aspect ratio adjustment
-- In-memory image processing (no disk I/O until save)
-- Cross-platform support (macOS, Windows, Linux)
-- Modern UI with dark/light mode support
-- Real-time processing progress feedback
-- Image preview with before/after comparison
-- Export to 4K, 5K, or 8K resolutions
-- Multi-API provider architecture (ready for Unsplash, Pexels, etc.)
+- macOS folder access permission prompts (Desktop, Documents, Downloads, Pictures)
+- Entitlements plist for macOS ad-hoc signing with file access and network permissions
+- Version info in wails.json (productVersion: 0.0.2)
 
-### Backend (Go/Wails)
-- Image processor service for encoding/decoding
-- API provider service with Pixabay implementation
-- Python bridge for AI model integration
-- Upscaler service for managing AI binaries
-- Complete Wails bindings for frontend integration
-
-### Frontend (Next.js + React)
-- Search panel with Pixabay integration
-- Image upload component with drag & drop
-- Processing panel with resolution and options
-- Image preview with side-by-side comparison
-- Responsive UI with Tailwind CSS
-- TypeScript for type safety
-
-### Python Integration
-- Image classification script (heuristic-based)
-- Seam carving implementation
-- Ready for DeepGHS/imgutils integration
-- NumPy and Pillow for image processing
-
-### Build System
-- Cross-platform build scripts
-- AI binary download automation
-- Platform-specific model distribution
-- Development and production build modes
-
-### Documentation
-- Comprehensive README
-- Quick start guide (QUICKSTART.md)
-- Development guide (DEVELOPMENT.md)
-- API documentation (API.md)
-- Build instructions (BUILD.md)
-- Environment configuration (.env.example)
+### Fixed
+- macOS permission issues when accessing user folders
 
 ## [0.0.1] - 2026-02-07
 
