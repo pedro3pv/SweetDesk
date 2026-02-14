@@ -88,7 +88,9 @@ jobs:
 
       - name: Install dependencies with Bun
         working-directory: frontend
-        run: bun install --frozen-lockfile
+        run: |
+          bun install --frozen-lockfile
+          bun add -d @types/gensync
 
 
       - name: Setup Go
@@ -102,7 +104,7 @@ jobs:
         if: matrix.build.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
 
       - name: Tidy Go modules
@@ -113,8 +115,8 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
 
-      - name: Build Wails with Bun
-        run: wails build -platform ${{ matrix.build.platform }}
+      - name: Build Wails with Bun (Obfuscated)
+        run: wails build -obfuscated -platform ${{ matrix.build.platform }}
 
 
       - name: Upload artifact
