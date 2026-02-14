@@ -347,7 +347,21 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 			}
 
 			// Save input to temp file
-			tmpInput := filepath.Join(a.coreBridge.TmpDir, fmt.Sprintf("batch-%s-input.png", item.ID))
+			if a.coreBridge == nil {
+				a.procMu.Lock()
+				a.procStatus.Items[i].Status = "error"
+				a.procStatus.Items[i].Error = "core bridge not initialized"
+				a.procMu.Unlock()
+				a.emitProcessingStatus()
+				continue
+			}
+
+			tmpDir := a.coreBridge.TmpDir
+			if tmpDir == "" {
+				tmpDir = os.TempDir()
+			}
+
+			tmpInput := filepath.Join(tmpDir, fmt.Sprintf("batch-%s-input.png", item.ID))
 			if err := os.WriteFile(tmpInput, data, 0644); err != nil {
 				a.procMu.Lock()
 				a.procStatus.Items[i].Status = "error"
