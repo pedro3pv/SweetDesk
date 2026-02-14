@@ -55,7 +55,6 @@ jobs:
           # Usa PAT_TOKEN para clonar repositório privado
           git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/pedro3pv/SweetDesk-core.git
           ls -la
-          cd ${{ github.workspace }}
 
 
       - name: Verify SweetDesk-core cloned
@@ -88,6 +87,7 @@ jobs:
 
 
       - name: Install dependencies with Bun
+        working-directory: frontend
         run: bun install --frozen-lockfile
 
 
@@ -168,7 +168,7 @@ jobs:
       - name: Get version from package.json
         id: version
         run: |
-          VERSION=$(bunx jq -r '.version' package.json)
+          VERSION=$(bunx jq -r '.version' frontend/package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
 
