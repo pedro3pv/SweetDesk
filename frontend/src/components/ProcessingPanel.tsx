@@ -30,7 +30,6 @@ export default function ProcessingPanel({
         setProgress('Starting processing...');
 
         try {
-            // Show progress indicators for user feedback during processing
             setProgress('🔍 Analyzing image...');
             await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -45,32 +44,6 @@ export default function ProcessingPanel({
                 case '5K': targetWidth = 5120; targetHeight = 2880; break;
                 case '8K': targetWidth = 7680; targetHeight = 4320; break;
             }
-            // Step 1: Classify
-            setProgress('🔍 Classifying image type...');
-            // @ts-ignore
-            const imageType = await window.go.main.App.ClassifyImage(imageData);
-            
-            setProgress(`📊 Detected: ${imageType === 'anime' ? '🎨 Anime' : '📷 Photo'}`);
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Step 2: Upscale
-            setProgress('🚀 Upscaling to ' + targetResolution + '...');
-            const scale = targetResolution === '8K' ? 8 : targetResolution === '5K' ? 5 : 4;
-            
-            // @ts-ignore
-            const upscaled = await window.go.main.App.UpscaleImage(imageData, imageType, scale);
-            
-            setProgress('✨ Adjusting aspect ratio...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Step 3: Full processing
-            setProgress('🎨 Finalizing...');
-            // @ts-ignore
-            const result = await window.go.main.App.ProcessImage(
-                upscaled,
-                targetResolution,
-                useSeamCarving
-            );
 
             // Full processing (classification + upscale + adjustments in backend)
             const result = await ProcessImage(
@@ -98,15 +71,14 @@ export default function ProcessingPanel({
     };
 
     return (
-        <div className="bg-white/90 dark:bg-dark-surface/90 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200/50 dark:border-dark-border p-4 lg:p-6">
-            <h3 className="text-base lg:text-lg font-semibold text-purple-900 dark:text-purple-200 mb-4">
+        <div className="bg-card rounded-xl shadow-lg border border-border p-4 lg:p-6">
+            <h3 className="text-base lg:text-lg font-semibold text-foreground mb-4">
                 Processing Options
             </h3>
 
             {/* Resolution Selection */}
             <div className="mb-4">
-                <label className="block text-xs lg:text-sm font-medium text-purple-800 dark:text-purple-300 mb-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-xs lg:text-sm font-medium text-muted-foreground mb-2">
                     Target Resolution
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -114,66 +86,36 @@ export default function ProcessingPanel({
                         <button
                             key={res}
                             onClick={() => setTargetResolution(res)}
-                            className={`py-2 px-3 lg:px-4 rounded-lg text-sm lg:text-base font-medium transition-all transform ${
+                            className={`py-2 px-3 lg:px-4 rounded-lg text-sm lg:text-base font-medium transition-colors ${
                                 targetResolution === res
-                                    ? 'bg-linear-to-r from-purple-500 to-indigo-600 text-white shadow-lg scale-105'
-                                    : 'bg-purple-100 dark:bg-dark-surface text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/30 hover:scale-105'
-                            className={`py-2 px-4 rounded-lg font-medium transition-colors ${
-                                targetResolution === res
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                             }`}
                         >
                             {res}
                         </button>
                     ))}
                 </div>
-                <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">
-                    {targetResolution === '4K' && '3840 × 2160'}
-                    {targetResolution === '5K' && '5120 × 2880'}
-                    {targetResolution === '8K' && '7680 × 4320'}
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                     {targetResolution === '4K' && '3840 × 2160'}
                     {targetResolution === '5K' && '5120 × 2880'}
                     {targetResolution === '8K' && '7680 × 4320'}
                 </p>
             </div>
-
-            {/* Aspect Ratio Method */}
-            <div className="mb-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={useSeamCarving}
-                        onChange={(e) => setUseSeamCarving(e.target.checked)}
-                        className="w-4 h-4 text-blue-500 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                        Use Content-Aware Resize (Seam Carving)
-                    </span>
-                </label>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-6">
-                    {useSeamCarving
-                        ? 'Intelligently preserves important content (slower)'
-                        : 'Fast center crop to target aspect ratio'}
-                </p>
-            </div>
-
-            {/* ...existing code... */}
 
             {/* Process Button */}
             <button
                 onClick={handleProcess}
                 disabled={isProcessing || !imageData}
-                className="w-full py-2.5 lg:py-3 bg-linear-to-r from-purple-500 via-indigo-500 to-purple-600 text-white rounded-lg text-sm lg:text-base font-semibold hover:from-purple-600 hover:via-indigo-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:transform-none shadow-lg hover:shadow-xl"
+                className="w-full py-2.5 lg:py-3 bg-primary text-primary-foreground rounded-lg text-sm lg:text-base font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
                 {isProcessing ? '⏳ Processing...' : '🚀 Process Image'}
             </button>
 
             {/* Progress Display */}
             {progress && (
-                <div className="mt-4 p-3 bg-linear-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                    <p className="text-xs lg:text-sm text-purple-700 dark:text-purple-300 text-center font-medium">
+                <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-border">
+                    <p className="text-xs lg:text-sm text-foreground text-center font-medium">
                         {progress}
                     </p>
                 </div>
