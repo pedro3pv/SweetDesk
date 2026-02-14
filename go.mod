@@ -48,5 +48,5 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 )
 
-// Uncomment to use local development version
+// Uncomment to use local development version (CI will uncomment automatically)
 // replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core
