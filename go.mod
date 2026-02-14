@@ -3,7 +3,7 @@ module SweetDesk
 go 1.25.7
 
 require (
-	github.com/pedro3pv/SweetDesk-core v0.0.3
+	github.com/pedro3pv/SweetDesk-core v0.0.4
 	github.com/wailsapp/wails/v2 v2.11.0
 )
 
