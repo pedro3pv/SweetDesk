@@ -125,6 +125,8 @@ jobs:
 
       - name: Generate code in SweetDesk-core
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd ../SweetDesk-core
           go generate ./...
