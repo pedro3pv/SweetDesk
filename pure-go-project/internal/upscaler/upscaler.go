@@ -12,6 +12,8 @@ import (
 
 	ort "github.com/yalue/onnxruntime_go"
 	"golang.org/x/image/draw"
+
+	"pure-go-project/internal/runtime"
 )
 
 type UpscalerType string
@@ -53,6 +55,11 @@ type Upscaler struct {
 }
 
 func NewUpscaler(modelType UpscalerType, modelDir string, onnxLibPath string) (*Upscaler, error) {
+	// Usa o singleton para inicializar o runtime
+	if err := runtime.GetInstance().Initialize(onnxLibPath); err != nil {
+		return nil, fmt.Errorf("falha ao inicializar runtime: %w", err)
+	}
+
 	u := &Upscaler{
 		modelType:  modelType,
 		tileSize:   512,
