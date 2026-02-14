@@ -9,5 +9,8 @@
     "author": {
         "name": "pedro3pv",
         "email": "pedro_atm3p@hotmail.com"
+    },
+    "info": {
+        "productVersion": "0.0.2"
     }
 }

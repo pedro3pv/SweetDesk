@@ -178,19 +178,56 @@ jobs:
           chmod +x "$APP_PATH/Contents/MacOS/"*
           echo "✅ Permissões configuradas"
 
-      - name: Remove quarantine attribute (macOS only)
+      - name: Ad-hoc sign macOS app
         if: matrix.build.os == 'macos-latest'
         run: |
-          echo "🔓 Removendo atributo de quarentena do macOS..."
-          find build/bin -name "*.app" -exec xattr -cr {} \;
-          echo "✅ Atributos de quarentena removidos"
+          APP_PATH=$(find build/bin -name "*.app" -type d -maxdepth 1 | head -n 1)
+          
+          echo "🔏 Signing internal frameworks and libraries..."
+          # Sign internal frameworks/dylibs first if they exist
+          if [ -d "$APP_PATH/Contents/Frameworks" ]; then
+            find "$APP_PATH/Contents/Frameworks" -name "*.dylib" -exec codesign --force -s - {} \;
+            find "$APP_PATH/Contents/Frameworks" -name "*.framework" -exec codesign --force -s - {} \;
+          fi
+          
+          echo "🔏 Ad-hoc signing the app bundle..."
+          codesign --force --entitlements build/darwin/entitlements.plist -s - "$APP_PATH"
+          
+          echo "🔍 Verifying signature..."
+          codesign -vv "$APP_PATH"
+          echo "✅ Ad-hoc signing complete"
+
+      - name: Create DMG (macOS only)
+        if: matrix.build.os == 'macos-latest'
+        run: |
+          # Install create-dmg
+          brew install create-dmg
+          
+          APP_PATH=$(find build/bin -name "*.app" -type d -maxdepth 1 | head -n 1)
+          APP_NAME=$(basename "$APP_PATH" .app)
+          
+          echo "📦 Creating DMG for $APP_NAME..."
+          
+          create-dmg \
+            --volname "$APP_NAME" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "$APP_NAME.app" 150 190 \
+            --app-drop-link 450 190 \
+            --no-internet-enable \
+            "build/bin/${APP_NAME}-darwin-arm64.dmg" \
+            "$APP_PATH"
+          
+          echo "✅ DMG created: build/bin/${APP_NAME}-darwin-arm64.dmg"
+          ls -lah build/bin/*.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.build.artifact }}
           path: |
-            build/bin/*
+            ${{ matrix.build.os == 'macos-latest' && 'build/bin/*.dmg' || 'build/bin/*' }}
 
   create-release:
     needs: build
@@ -242,56 +279,21 @@ jobs:
             unzip -l release-files/SweetDesk-windows-amd64.zip | head -n 10
           fi
           
-          # macOS: Criar TAR.GZ preservando symlinks e permissões
+          # macOS: O DMG já está pronto
           if [ -d "release-artifacts/app-darwin-arm64" ]; then
-            echo "📦 Criando TAR.GZ para macOS..."
+            echo "📦 Preparando DMG para macOS..."
             
-            # Encontrar o arquivo .app
-            APP_PATH=$(find release-artifacts/app-darwin-arm64 -name "*.app" -type d -maxdepth 1 | head -n 1)
+            # Encontrar o arquivo .dmg
+            DMG_PATH=$(find release-artifacts/app-darwin-arm64 -name "*.dmg" -maxdepth 1 | head -n 1)
             
-            if [ -z "$APP_PATH" ]; then
-              echo "❌ Nenhum arquivo .app encontrado"
+            if [ -z "$DMG_PATH" ]; then
+              echo "❌ Nenhum arquivo .dmg encontrado"
               ls -la release-artifacts/app-darwin-arm64/
               exit 1
             fi
             
-            APP_NAME=$(basename "$APP_PATH")
-            echo "✅ Encontrado: $APP_NAME"
-            
-            # Verificar estrutura do bundle antes de empacotar
-            if [ ! -d "$APP_PATH/Contents" ]; then
-              echo "❌ Estrutura do .app inválida (falta Contents/)"
-              exit 1
-            fi
-            
-            if [ ! -d "$APP_PATH/Contents/MacOS" ]; then
-              echo "❌ Estrutura do .app inválida (falta Contents/MacOS/)"
-              exit 1
-            fi
-            
-            echo "✅ Estrutura do bundle válida"
-            
-            # Criar TAR.GZ preservando symlinks, permissões e metadata
-            cd release-artifacts/app-darwin-arm64
-            tar -czf ../../release-files/SweetDesk-darwin-arm64.tar.gz "$APP_NAME"
-            cd ../..
-            
-            echo "✅ SweetDesk-darwin-arm64.tar.gz criado"
-            
-            # Verificar integridade do TAR.GZ
-            echo "🔍 Verificando TAR.GZ macOS..."
-            tar -tzf release-files/SweetDesk-darwin-arm64.tar.gz | grep -E "(Contents/MacOS|Contents/Info.plist)" | head -n 5
-            
-            if tar -tzf release-files/SweetDesk-darwin-arm64.tar.gz | grep -q "Contents/MacOS"; then
-              echo "✅ Estrutura do bundle preservada no arquivo"
-            else
-              echo "⚠️ AVISO: Estrutura do bundle pode estar incorreta"
-            fi
-            
-            # Verificar se symlinks foram preservados
-            if tar -tzf release-files/SweetDesk-darwin-arm64.tar.gz | grep -q "Frameworks"; then
-              echo "✅ Frameworks encontrados no arquivo"
-            fi
+            cp "$DMG_PATH" release-files/SweetDesk-darwin-arm64.dmg
+            echo "✅ SweetDesk-darwin-arm64.dmg copiado"
           fi
           
           echo ""
@@ -315,42 +317,21 @@ jobs:
             |----------|------|------------|
             | 🐧 Linux (x64) | `SweetDesk-linux-amd64.zip` | Extrair e executar |
             | 🪟 Windows (x64) | `SweetDesk-windows-amd64.zip` | Extrair e executar .exe |
-            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64.tar.gz` | Extrair e mover para Aplicativos |
+            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64.dmg` | Abrir DMG e arrastar para Aplicativos |
             
             ### ⚠️ Nota para usuários macOS
             
-            **Após extrair o arquivo `.tar.gz`:**
+            **O app é assinado com ad-hoc signing.** Na primeira execução:
             
-            1. **Extrair o arquivo:**
-               ```bash
-               tar -xzf SweetDesk-darwin-arm64.tar.gz
-               ```
+            1. **Abrir o DMG** e arrastar o SweetDesk para a pasta Aplicativos
+            2. **Primeira execução:** Clique com botão direito no app → **Abrir** → **Abrir**
+            3. Ou vá em **Configurações do Sistema → Privacidade e Segurança** e permita o app
             
-            2. **Mover para a pasta Aplicativos:**
-               ```bash
-               mv SweetDesk.app /Applications/
-               ```
-            
-            3. **Remover atributo de quarentena:**
-               ```bash
-               xattr -cr /Applications/SweetDesk.app
-               ```
-            
-            4. **Executar pela primeira vez:**
-               - Clique com botão direito no app → **Abrir** → **Abrir**
-               - Ou use o Launchpad normalmente após a primeira abertura
-            
-            **Se ainda aparecer "danificado":**
-            ```bash
-            sudo spctl --master-disable
-            sudo spctl --add --label "SweetDesk" /Applications/SweetDesk.app
-            sudo spctl --master-enable
-            ```
+            O app pedirá permissão para acessar pastas (Imagens, Downloads, etc.) na primeira vez que salvar arquivos.
             
             ### 🐛 Problemas conhecidos
             
-            - **macOS Gatekeeper**: Apps não assinados podem exibir avisos de segurança na primeira execução
-            - **Solução permanente**: Use os comandos acima para adicionar exceção
+            - **macOS Gatekeeper**: Apps não assinados oficialmente podem exibir avisos de segurança na primeira execução
             
             ### 📝 Changelog
           files: release-files/*
