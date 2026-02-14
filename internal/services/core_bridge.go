@@ -1,107 +1,290 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"image/jpeg"
+	"image/png"
+	"io"
+	"log"
+	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/pedro3pv/SweetDesk-core/pkg/processor"
 )
 
-// CoreBridge adapts SweetDesk-core processor to our existing services interface
+// CoreBridge wraps SweetDesk-core processor for Wails
 type CoreBridge struct {
 	ctx       context.Context
 	processor *processor.Processor
 }
 
-// NewCoreBridge creates a new core bridge instance
+// NewCoreBridge creates a new CoreBridge instance
 func NewCoreBridge(ctx context.Context) (*CoreBridge, error) {
-	modelDir := os.Getenv("SWEETDESK_MODEL_DIR")
-	if modelDir == "" {
-		modelDir = "./models"
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	onnxLibPath := os.Getenv("ONNX_LIB_PATH")
+	// Initialize processor with default config
+	config := processor.Config{
+		ModelDir: "./models",
+	}
 
-	p, err := processor.New(processor.Config{
-		ModelDir:    modelDir,
-		ONNXLibPath: onnxLibPath,
-	})
+	// Try to get ONNX lib path from environment
+	if onnxPath := os.Getenv("ONNX_LIB_PATH"); onnxPath != "" {
+		config.ONNXLibPath = onnxPath
+	}
+
+	proc, err := processor.New(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize SweetDesk-core processor: %w", err)
+		return nil, fmt.Errorf("failed to initialize processor: %w", err)
 	}
 
-	return &CoreBridge{
+	bridge := &CoreBridge{
 		ctx:       ctx,
-		processor: p,
-	}, nil
-}
-
-// Close closes the core bridge
-func (cb *CoreBridge) Close() error {
-	if cb.processor != nil {
-		cb.processor.Close()
+		processor: proc,
 	}
-	return nil
+
+	log.Println("✅ SweetDesk-core bridge initialized")
+	return bridge, nil
 }
 
-// Classify classifies an image
-func (cb *CoreBridge) Classify(imageData []byte) (string, error) {
+// ClassifyImage classifies an image by type
+func (cb *CoreBridge) ClassifyImage(imageData []byte) (string, float32, error) {
 	if cb.processor == nil {
-		return "", fmt.Errorf("processor not initialized")
+		return "", 0, fmt.Errorf("processor not initialized")
 	}
 
 	result, err := cb.processor.Classify(imageData)
 	if err != nil {
-		return "", err
+		return "photo", 0, fmt.Errorf("classification failed: %w", err)
 	}
 
-	return result.Type, nil
+	return result.Type, result.Confidence, nil
 }
 
-// Upscale upscales an image
-func (cb *CoreBridge) Upscale(imageData []byte, imageType string, scale int) ([]byte, error) {
+// UpscaleImage upscales an image to target scale
+func (cb *CoreBridge) UpscaleImage(imageData []byte, scale int, format string) ([]byte, error) {
 	if cb.processor == nil {
 		return nil, fmt.Errorf("processor not initialized")
 	}
 
+	if format == "" {
+		format = "png"
+	}
+
 	options := processor.ProcessOptions{
-		ImageType:    imageType,
 		TargetScale:  scale,
-		OutputFormat: "png",
+		OutputFormat: format,
 	}
 
-	return cb.processor.Upscale(imageData, options)
+	result, err := cb.processor.Upscale(imageData, options)
+	if err != nil {
+		return nil, fmt.Errorf("upscaling failed: %w", err)
+	}
+
+	return result.Data, nil
 }
 
-// UpscaleToResolution upscales an image to specific dimensions
-func (cb *CoreBridge) UpscaleToResolution(imageData []byte, width int, height int, keepAspectRatio bool) ([]byte, error) {
+// DownloadImage downloads an image from URL
+func (cb *CoreBridge) DownloadImage(url string) ([]byte, error) {
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("download failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download failed: status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body failed: %w", err)
+	}
+
+	return data, nil
+}
+
+// ProcessImage is the main processing pipeline
+func (cb *CoreBridge) ProcessImage(imageData []byte, targetWidth, targetHeight int, format string, aspectRatio string) ([]byte, error) {
 	if cb.processor == nil {
 		return nil, fmt.Errorf("processor not initialized")
 	}
 
-	options := processor.ProcessOptions{
-		TargetWidth:     width,
-		TargetHeight:    height,
-		KeepAspectRatio: keepAspectRatio,
-		OutputFormat:    "png",
+	if format == "" {
+		format = "png"
 	}
 
-	return cb.processor.UpscaleToResolution(imageData, options)
+	options := processor.ProcessOptions{
+		TargetWidth:       targetWidth,
+		TargetHeight:      targetHeight,
+		TargetAspectRatio: aspectRatio,
+		OutputFormat:      format,
+		KeepAspectRatio:   true,
+	}
+
+	result, err := cb.processor.Process(imageData, options)
+	if err != nil {
+		return nil, fmt.Errorf("processing failed: %w", err)
+	}
+
+	return result.Data, nil
 }
 
-// AdjustAspectRatio adjusts the aspect ratio using seam carving
-func (cb *CoreBridge) AdjustAspectRatio(imageData []byte, targetWidth int, targetHeight int) ([]byte, error) {
+// SaveImage saves processed image to file
+func (cb *CoreBridge) SaveImage(imageData []byte, savePath, fileName string) (string, error) {
+	if savePath == "" || fileName == "" {
+		return "", fmt.Errorf("save path and filename required")
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(savePath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	filePath := filepath.Join(savePath, fileName)
+
+	if err := os.WriteFile(filePath, imageData, 0644); err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	log.Printf("✅ Image saved to %s", filePath)
+	return filePath, nil
+}
+
+// GetInfo returns processor information
+func (cb *CoreBridge) GetInfo() (map[string]interface{}, error) {
 	if cb.processor == nil {
 		return nil, fmt.Errorf("processor not initialized")
 	}
 
-	options := processor.ProcessOptions{
-		TargetWidth:    targetWidth,
-		TargetHeight:   targetHeight,
-		UseSeamCarving: true,
-		OutputFormat:   "png",
+	info := map[string]interface{}{
+		"engine":  "SweetDesk-core",
+		"status":  "ready",
+		"version": "0.1.0",
 	}
 
-	return cb.processor.AdjustAspectRatio(imageData, options)
+	return info, nil
+}
+
+// Close closes the bridge and processor
+func (cb *CoreBridge) Close() error {
+	if cb.processor != nil {
+		return cb.processor.Close()
+	}
+	return nil
+}
+
+// ImageProcessor helper (for backward compatibility)
+type ImageProcessor struct{
+	ctx context.Context
+}
+
+// NewImageProcessor creates image processor
+func NewImageProcessor(ctx context.Context) *ImageProcessor {
+	return &ImageProcessor{ctx: ctx}
+}
+
+// ConvertToBase64 converts image bytes to base64 string
+func (ip *ImageProcessor) ConvertToBase64(imageData []byte) string {
+	return base64.StdEncoding.EncodeToString(imageData)
+}
+
+// ConvertFromBase64 converts base64 string to image bytes
+func (ip *ImageProcessor) ConvertFromBase64(base64Data string) ([]byte, error) {
+	data, err := base64.StdEncoding.DecodeString(base64Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateImage validates image format and size
+func (ip *ImageProcessor) ValidateImage(imageData []byte) error {
+	if len(imageData) == 0 {
+		return fmt.Errorf("empty image data")
+	}
+
+	// Try to decode to validate format
+	_, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return fmt.Errorf("invalid image format: %w", err)
+	}
+
+	return nil
+}
+
+// GetImageInfo returns image information
+func (ip *ImageProcessor) GetImageInfo(imageData []byte) (map[string]int, error) {
+	img, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	bounds := img.Bounds()
+	info := map[string]int{
+		"width":  bounds.Dx(),
+		"height": bounds.Dy(),
+	}
+
+	return info, nil
+}
+
+// SaveToFile saves image to file system
+func (ip *ImageProcessor) SaveToFile(imageData []byte, savePath, fileName string) (string, error) {
+	if savePath == "" || fileName == "" {
+		return "", fmt.Errorf("save path and filename required")
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(savePath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	filePath := filepath.Join(savePath, fileName)
+
+	if err := os.WriteFile(filePath, imageData, 0644); err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	log.Printf("✅ File saved to %s", filePath)
+	return filePath, nil
+}
+
+// ConvertFormat converts image between formats
+func (ip *ImageProcessor) ConvertFormat(imageData []byte, targetFormat string) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	var buf bytes.Buffer
+
+	switch targetFormat {
+	case "png":
+		err = png.Encode(&buf, img)
+	case "jpg", "jpeg":
+		err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
+	default:
+		err = png.Encode(&buf, img)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode image: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
