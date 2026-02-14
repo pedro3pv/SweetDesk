@@ -34,9 +34,9 @@ jobs:
             os: 'windows-latest'
             artifact: 'app-windows-amd64.exe'
           - name: 'App-macOS'
-            platform: 'darwin/universal'
+            platform: 'darwin/arm64'
             os: 'macos-latest'
-            artifact: 'app-darwin-universal'
+            artifact: 'app-darwin-arm64'
 
 
     runs-on: ${{ matrix.build.os }}
@@ -115,6 +115,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+          # Criar symlink para webkit2gtk-4.0 apontar para 4.1
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc
 
 
       - name: Tidy Go modules
@@ -126,7 +128,6 @@ jobs:
         run: |
           cd ../SweetDesk-core
           go generate ./...
-          cd ${{ github.workspace }}
 
 
       - name: Install Wails CLI
@@ -166,7 +167,7 @@ jobs:
           files: |
             app-linux-amd64/*
             app-windows-amd64/*
-            app-darwin-universal/*
+            app-darwin-arm64/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
