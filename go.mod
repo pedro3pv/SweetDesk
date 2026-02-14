@@ -1,6 +1,6 @@
 module SweetDesk
 
-go 1.24.0
+go 1.25.7
 
 require (
 	github.com/owulveryck/onnx-go v0.5.0
@@ -16,7 +16,15 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/leesper/go_rng v0.0.0-20190531154944-a612b043e353 // indirect
+	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
+	github.com/pedro3pv/SweetDesk-core v0.0.0-20260214133840-f67b0add7ed0 // indirect
+	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
+	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
+	github.com/tklauser/go-sysconf v0.3.12 // indirect
+	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/xtgo/set v1.0.0 // indirect
+	github.com/yalue/onnxruntime_go v1.25.0 // indirect
+	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
