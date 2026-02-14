@@ -356,6 +356,8 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 				a.emitProcessingStatus()
 				continue
 			}
+			// Ensure temporary input file is cleaned up when processing is done
+			defer os.Remove(tmpInput)
 
 			tmpOutput := filepath.Join(savePath, fileName)
 
