@@ -1,290 +1,184 @@
 package services
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
-	"image/jpeg"
-	"image/png"
-	"io"
 	"log"
-	"net/http"
 	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/pedro3pv/SweetDesk-core/pkg/processor"
+	"github.com/pedro3pv/SweetDesk-core/pkg/types"
 )
 
-// CoreBridge wraps SweetDesk-core processor for Wails
+// CoreBridge wraps SweetDesk-core processor for Wails integration.
+// All upscaling and classification is delegated to the core library.
 type CoreBridge struct {
 	ctx       context.Context
-	processor *processor.Processor
+	processor *processor.ImageProcessor
+	TmpDir    string // temp directory for file-based operations
 }
 
-// NewCoreBridge creates a new CoreBridge instance
+// NewCoreBridge creates a new CoreBridge instance.
+// SweetDesk-core embeds models internally, so no modelsFS/modelDir is needed.
 func NewCoreBridge(ctx context.Context) (*CoreBridge, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	// Initialize processor with default config
-	config := processor.Config{
-		ModelDir: "./models",
+	// Create temp directory for intermediate files
+	tmpDir, err := os.MkdirTemp("", "sweetdesk-bridge-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	// Try to get ONNX lib path from environment
+	// Build config for SweetDesk-core
+	// Core will auto-use its internally embedded models
+	config := processor.Config{}
+
+	// Optional ONNX Runtime path from environment
 	if onnxPath := os.Getenv("ONNX_LIB_PATH"); onnxPath != "" {
 		config.ONNXLibPath = onnxPath
 	}
 
-	proc, err := processor.New(config)
+	// Create the core processor
+	proc, err := processor.NewImageProcessor(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize processor: %w", err)
+		os.RemoveAll(tmpDir)
+		return nil, fmt.Errorf("failed to initialize SweetDesk-core processor: %w", err)
 	}
 
 	bridge := &CoreBridge{
 		ctx:       ctx,
 		processor: proc,
+		TmpDir:    tmpDir,
 	}
 
 	log.Println("✅ SweetDesk-core bridge initialized")
 	return bridge, nil
 }
 
-// ClassifyImage classifies an image by type
-func (cb *CoreBridge) ClassifyImage(imageData []byte) (string, float32, error) {
+// ClassifyImage classifies an image (anime vs photo) from raw bytes.
+// Returns the detected type and confidence score.
+func (cb *CoreBridge) ClassifyImage(imageData []byte) (types.ImageType, float32, error) {
 	if cb.processor == nil {
-		return "", 0, fmt.Errorf("processor not initialized")
+		return types.ImageTypeUnknown, 0, fmt.Errorf("processor not initialized")
 	}
 
-	result, err := cb.processor.Classify(imageData)
+	// SweetDesk-core Classify expects a file path, write to temp
+	// Use unique temp file to avoid race conditions with concurrent operations
+	tmpFile, err := os.CreateTemp(cb.TmpDir, "classify-*.png")
 	if err != nil {
-		return "photo", 0, fmt.Errorf("classification failed: %w", err)
+		return types.ImageTypeUnknown, 0, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	if err := os.WriteFile(tmpPath, imageData, 0644); err != nil {
+		return types.ImageTypeUnknown, 0, fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	result, err := cb.processor.Classify(tmpPath)
+	if err != nil {
+		return types.ImageTypePhoto, 0, fmt.Errorf("classification failed: %w", err)
 	}
 
 	return result.Type, result.Confidence, nil
 }
 
-// UpscaleImage upscales an image to target scale
-func (cb *CoreBridge) UpscaleImage(imageData []byte, scale int, format string) ([]byte, error) {
+// UpscaleBytes upscales image bytes using SweetDesk-core with auto-classification.
+// The core automatically selects the best model (RealCUGAN for anime, LSDIR for photos).
+func (cb *CoreBridge) UpscaleBytes(imageData []byte, opts *types.ProcessingOptions) ([]byte, error) {
 	if cb.processor == nil {
 		return nil, fmt.Errorf("processor not initialized")
 	}
 
-	if format == "" {
-		format = "png"
+	// Create unique temp files to avoid race conditions with concurrent operations
+	tmpInputFile, err := os.CreateTemp(cb.TmpDir, "upscale-input-*.png")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create input temp file: %w", err)
+	}
+	tmpInput := tmpInputFile.Name()
+	tmpInputFile.Close()
+	defer os.Remove(tmpInput)
+
+	if err := os.WriteFile(tmpInput, imageData, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write input temp file: %w", err)
 	}
 
-	options := processor.ProcessOptions{
-		TargetScale:  scale,
-		OutputFormat: format,
+	// Create unique output temp file
+	tmpOutputFile, err := os.CreateTemp(cb.TmpDir, "upscale-output-*.png")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create output temp file: %w", err)
 	}
+	tmpOutput := tmpOutputFile.Name()
+	tmpOutputFile.Close()
+	defer os.Remove(tmpOutput)
 
-	result, err := cb.processor.Upscale(imageData, options)
+	// Process with options
+	_, err = cb.processor.ProcessWithOptions(tmpInput, tmpOutput, opts)
 	if err != nil {
 		return nil, fmt.Errorf("upscaling failed: %w", err)
 	}
 
-	return result.Data, nil
+	// Read result
+	result, err := os.ReadFile(tmpOutput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read output: %w", err)
+	}
+
+	return result, nil
 }
 
-// DownloadImage downloads an image from URL
-func (cb *CoreBridge) DownloadImage(url string) ([]byte, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	resp, err := client.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("download failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download failed: status %d", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read body failed: %w", err)
-	}
-
-	return data, nil
-}
-
-// ProcessImage is the main processing pipeline
-func (cb *CoreBridge) ProcessImage(imageData []byte, targetWidth, targetHeight int, format string, aspectRatio string) ([]byte, error) {
+// ProcessFile processes a single image file (input path → output path).
+// Combines classification + upscaling in one call.
+func (cb *CoreBridge) ProcessFile(inputPath, outputPath string, opts *types.ProcessingOptions) (*types.ProcessingResult, error) {
 	if cb.processor == nil {
 		return nil, fmt.Errorf("processor not initialized")
 	}
 
-	if format == "" {
-		format = "png"
-	}
-
-	options := processor.ProcessOptions{
-		TargetWidth:       targetWidth,
-		TargetHeight:      targetHeight,
-		TargetAspectRatio: aspectRatio,
-		OutputFormat:      format,
-		KeepAspectRatio:   true,
-	}
-
-	result, err := cb.processor.Process(imageData, options)
-	if err != nil {
-		return nil, fmt.Errorf("processing failed: %w", err)
-	}
-
-	return result.Data, nil
+	return cb.processor.ProcessWithOptions(inputPath, outputPath, opts)
 }
 
-// SaveImage saves processed image to file
-func (cb *CoreBridge) SaveImage(imageData []byte, savePath, fileName string) (string, error) {
-	if savePath == "" || fileName == "" {
-		return "", fmt.Errorf("save path and filename required")
+// ProcessBatch processes multiple images using SweetDesk-core batch API.
+func (cb *CoreBridge) ProcessBatch(
+	items []types.BatchItem,
+	progressCallback types.ProgressCallback,
+) (*types.BatchResult, error) {
+	if cb.processor == nil {
+		return nil, fmt.Errorf("processor not initialized")
 	}
 
-	// Ensure directory exists
-	if err := os.MkdirAll(savePath, 0755); err != nil {
-		return "", fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	filePath := filepath.Join(savePath, fileName)
-
-	if err := os.WriteFile(filePath, imageData, 0644); err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
-	}
-
-	log.Printf("✅ Image saved to %s", filePath)
-	return filePath, nil
+	return cb.processor.ProcessBatch(items, progressCallback)
 }
 
 // GetInfo returns processor information
-func (cb *CoreBridge) GetInfo() (map[string]interface{}, error) {
-	if cb.processor == nil {
-		return nil, fmt.Errorf("processor not initialized")
-	}
-
+func (cb *CoreBridge) GetInfo() map[string]interface{} {
 	info := map[string]interface{}{
 		"engine":  "SweetDesk-core",
 		"status":  "ready",
-		"version": "0.1.0",
+		"version": "0.2.0",
 	}
-
-	return info, nil
+	return info
 }
 
-// Close closes the bridge and processor
+// Close releases all resources held by the bridge.
+// Must be called when the application shuts down.
 func (cb *CoreBridge) Close() error {
+	log.Println("🗑️  Closing SweetDesk-core bridge...")
+
+	var closeErr error
 	if cb.processor != nil {
-		return cb.processor.Close()
-	}
-	return nil
-}
-
-// ImageProcessor helper (for backward compatibility)
-type ImageProcessor struct{
-	ctx context.Context
-}
-
-// NewImageProcessor creates image processor
-func NewImageProcessor(ctx context.Context) *ImageProcessor {
-	return &ImageProcessor{ctx: ctx}
-}
-
-// ConvertToBase64 converts image bytes to base64 string
-func (ip *ImageProcessor) ConvertToBase64(imageData []byte) string {
-	return base64.StdEncoding.EncodeToString(imageData)
-}
-
-// ConvertFromBase64 converts base64 string to image bytes
-func (ip *ImageProcessor) ConvertFromBase64(base64Data string) ([]byte, error) {
-	data, err := base64.StdEncoding.DecodeString(base64Data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64: %w", err)
-	}
-	return data, nil
-}
-
-// ValidateImage validates image format and size
-func (ip *ImageProcessor) ValidateImage(imageData []byte) error {
-	if len(imageData) == 0 {
-		return fmt.Errorf("empty image data")
+		closeErr = cb.processor.Close()
+		cb.processor = nil
 	}
 
-	// Try to decode to validate format
-	_, _, err := image.Decode(bytes.NewReader(imageData))
-	if err != nil {
-		return fmt.Errorf("invalid image format: %w", err)
+	// Cleanup temp directory
+	if cb.TmpDir != "" {
+		os.RemoveAll(cb.TmpDir)
+		cb.TmpDir = ""
 	}
 
-	return nil
-}
-
-// GetImageInfo returns image information
-func (ip *ImageProcessor) GetImageInfo(imageData []byte) (map[string]int, error) {
-	img, _, err := image.Decode(bytes.NewReader(imageData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode image: %w", err)
-	}
-
-	bounds := img.Bounds()
-	info := map[string]int{
-		"width":  bounds.Dx(),
-		"height": bounds.Dy(),
-	}
-
-	return info, nil
-}
-
-// SaveToFile saves image to file system
-func (ip *ImageProcessor) SaveToFile(imageData []byte, savePath, fileName string) (string, error) {
-	if savePath == "" || fileName == "" {
-		return "", fmt.Errorf("save path and filename required")
-	}
-
-	// Ensure directory exists
-	if err := os.MkdirAll(savePath, 0755); err != nil {
-		return "", fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	filePath := filepath.Join(savePath, fileName)
-
-	if err := os.WriteFile(filePath, imageData, 0644); err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
-	}
-
-	log.Printf("✅ File saved to %s", filePath)
-	return filePath, nil
-}
-
-// ConvertFormat converts image between formats
-func (ip *ImageProcessor) ConvertFormat(imageData []byte, targetFormat string) ([]byte, error) {
-	img, _, err := image.Decode(bytes.NewReader(imageData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode image: %w", err)
-	}
-
-	var buf bytes.Buffer
-
-	switch targetFormat {
-	case "png":
-		err = png.Encode(&buf, img)
-	case "jpg", "jpeg":
-		err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
-	default:
-		err = png.Encode(&buf, img)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode image: %w", err)
-	}
-
-	return buf.Bytes(), nil
+	log.Println("✅ SweetDesk-core bridge closed")
+	return closeErr
 }

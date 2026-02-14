@@ -3,7 +3,6 @@ package main
 import (
 	"SweetDesk/internal/services"
 	"context"
-	"embed"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/pedro3pv/SweetDesk-core/pkg/types"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -44,9 +44,8 @@ type ProcessingStatus struct {
 type App struct {
 	ctx            context.Context
 	imageProcessor *services.ImageProcessor
-	upscaler       *services.Upscaler
+	coreBridge     *services.CoreBridge
 	pixabayKey     string
-	modelsFS       embed.FS
 
 	// Batch processing state
 	procMu     sync.Mutex
@@ -54,10 +53,8 @@ type App struct {
 }
 
 // NewApp creates a new App application struct
-func NewApp(modelsFS embed.FS) *App {
-	return &App{
-		modelsFS: modelsFS,
-	}
+func NewApp() *App {
+	return &App{}
 }
 
 // startup is called at application startup
@@ -67,13 +64,23 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize services
 	a.imageProcessor = services.NewImageProcessor(ctx)
 
-	// Initialize upscaler (pure Go, no DLL needed!)
-	upscaler, err := services.NewUpscaler(ctx, services.RealCUGAN, a.modelsFS)
+	// Initialize SweetDesk-core bridge
+	bridge, err := services.NewCoreBridge(ctx)
 	if err != nil {
-		fmt.Printf("Failed to initialize upscaler: %v\n", err)
+		// Do not terminate the entire application if the bridge fails to initialize.
+		// Log the error and continue without the bridge (upscaling features disabled).
+		log.Printf("SweetDesk-core bridge disabled: failed to initialize: %v", err)
+
+		// Show a user-friendly warning dialog so the user understands that
+		// upscaling features will be unavailable until the bridge is configured.
+		_, _ = wailsRuntime.MessageDialog(ctx, wailsRuntime.MessageDialogOptions{
+			Type:    wailsRuntime.WarningDialog,
+			Title:   "Upscaling Unavailable",
+			Message: "SweetDesk-core bridge could not be initialized. Upscaling features will be unavailable.\n\nDetails: " + err.Error(),
+		})
 	} else {
-		a.upscaler = upscaler
-		fmt.Println("✅ Upscaler initialized (pure Go, no external dependencies)")
+		a.coreBridge = bridge
+		fmt.Println("✅ SweetDesk-core bridge initialized")
 	}
 
 	// Get Pixabay API key from environment
@@ -87,9 +94,9 @@ func (a *App) domReady(ctx context.Context) {
 
 // beforeClose is called when the application is about to quit
 func (a *App) beforeClose(ctx context.Context) (prevent bool) {
-	// Cleanup upscaler
-	if a.upscaler != nil {
-		a.upscaler.Close()
+	// Cleanup SweetDesk-core bridge
+	if a.coreBridge != nil {
+		a.coreBridge.Close()
 	}
 	return false
 }
@@ -180,8 +187,8 @@ func (a *App) DownloadImage(imageURL string) (string, error) {
 
 // UpscaleImage upscales an image using AI
 func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (string, error) {
-	if a.upscaler == nil {
-		return "", fmt.Errorf("upscaler not initialized")
+	if a.coreBridge == nil {
+		return "", fmt.Errorf("coreBridge not initialized")
 	}
 
 	data, err := a.imageProcessor.ConvertFromBase64(base64Data)
@@ -189,13 +196,15 @@ func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (stri
 		return "", err
 	}
 
-	// Configure options based on scale
-	options := &services.UpscaleOptions{
-		ScaleFactor: float64(scale),
-		Format:      "png",
+	opts := &types.ProcessingOptions{
+		TargetWidth:     0,
+		TargetHeight:    0,
+		ScaleFactor:     float64(scale),
+		MaxResolution:   16384,
+		KeepAspectRatio: true,
 	}
 
-	upscaled, err := a.upscaler.UpscaleBytes(data, options)
+	upscaled, err := a.coreBridge.UpscaleBytes(data, opts)
 	if err != nil {
 		return "", err
 	}
@@ -205,31 +214,17 @@ func (a *App) UpscaleImage(base64Data string, imageType string, scale int) (stri
 
 // ProcessImage is the main processing pipeline
 func (a *App) ProcessImage(base64Data string, targetWidth int, targetHeight int, savePath string, fileName string) (string, error) {
-	if a.upscaler == nil {
-		return "", fmt.Errorf("upscaler not initialized")
+	if a.coreBridge == nil {
+		return "", fmt.Errorf("coreBridge not initialized")
 	}
 
-	// 1. Early validation of dimensions (before decoding Base64)
 	if targetWidth <= 0 || targetHeight <= 0 {
 		return "", fmt.Errorf("invalid target resolution: %dx%d (dimensions must be positive)", targetWidth, targetHeight)
 	}
 
-	// 2. Configurable maxResolution via UpscaleOptions
 	const defaultMaxResolution = 16384
 	maxResolution := defaultMaxResolution
 
-	// Prepare options with possible MaxResolution override
-	options := &services.UpscaleOptions{
-		TargetWidth:     targetWidth,
-		TargetHeight:    targetHeight,
-		KeepAspectRatio: false,
-		Format:          "png",
-	}
-	if options.MaxResolution > 0 && options.MaxResolution < defaultMaxResolution {
-		maxResolution = options.MaxResolution
-	}
-
-	// 3. Per-dimension and total pixel checks (before decode)
 	if targetWidth > maxResolution || targetHeight > maxResolution {
 		return "", fmt.Errorf("target resolution %dx%d exceeds maximum allowed dimensions of %dx%d",
 			targetWidth, targetHeight, maxResolution, maxResolution)
@@ -245,19 +240,24 @@ func (a *App) ProcessImage(base64Data string, targetWidth int, targetHeight int,
 			targetWidth, targetHeight, totalPixels/1_000_000, float64(maxPixels)/1_000_000, estMB, estGB)
 	}
 
-	// 4. Decode image (after validation)
 	data, err := a.imageProcessor.ConvertFromBase64(base64Data)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
 
-	// 5. Upscale image
-	upscaled, err := a.upscaler.UpscaleBytes(data, options)
+	opts := &types.ProcessingOptions{
+		TargetWidth:     targetWidth,
+		TargetHeight:    targetHeight,
+		ScaleFactor:     0,
+		MaxResolution:   maxResolution,
+		KeepAspectRatio: false,
+	}
+
+	upscaled, err := a.coreBridge.UpscaleBytes(data, opts)
 	if err != nil {
 		return "", fmt.Errorf("failed to upscale: %w", err)
 	}
 
-	// 6. Save to file if savePath is provided
 	if savePath != "" && fileName != "" {
 		_, err := a.imageProcessor.SaveToFile(upscaled, savePath, fileName)
 		if err != nil {
@@ -265,7 +265,6 @@ func (a *App) ProcessImage(base64Data string, targetWidth int, targetHeight int,
 		}
 	}
 
-	// 7. Return result as base64
 	return a.imageProcessor.ConvertToBase64(upscaled), nil
 }
 
@@ -307,67 +306,135 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 			a.emitProcessingStatus()
 		}()
 
+		// Prepare batch items for SweetDesk-core
+		batchItems := make([]types.BatchItem, len(items))
 		for i, item := range items {
-			a.procMu.Lock()
-			a.procStatus.Current = i
-			a.procStatus.Items[i].Status = "processing"
-			a.procMu.Unlock()
-			a.emitProcessingStatus()
+			// Get base64 data: either provided directly or download from URL
+			base64Data := item.Base64Data
+			if base64Data == "" && item.DownloadURL != "" {
+				downloaded, err := a.DownloadImage(item.DownloadURL)
+				if err != nil {
+					a.procMu.Lock()
+					a.procStatus.Items[i].Status = "error"
+					a.procStatus.Items[i].Error = err.Error()
+					a.procMu.Unlock()
+					a.emitProcessingStatus()
+					continue
+				}
+				base64Data = downloaded
+			}
+			if base64Data == "" {
+				a.procMu.Lock()
+				a.procStatus.Items[i].Status = "error"
+				a.procStatus.Items[i].Error = "no image data available"
+				a.procMu.Unlock()
+				a.emitProcessingStatus()
+				continue
+			}
 
-			err := a.processOneItem(item, savePath)
-
-			a.procMu.Lock()
+			data, err := a.imageProcessor.ConvertFromBase64(base64Data)
 			if err != nil {
-				log.Printf("❌ Failed to process item %s: %v", item.ID, err)
+				a.procMu.Lock()
 				a.procStatus.Items[i].Status = "error"
 				a.procStatus.Items[i].Error = err.Error()
-			} else {
-				a.procStatus.Items[i].Status = "done"
+				a.procMu.Unlock()
+				a.emitProcessingStatus()
+				continue
 			}
-			a.procStatus.Progress = int(float64(i+1) / float64(len(items)) * 100)
+
+			// Parse dimensions from "WIDTHxHEIGHT"
+			targetWidth, targetHeight := 3840, 2160
+			if item.Dimension != "" {
+				fmt.Sscanf(item.Dimension, "%dx%d", &targetWidth, &targetHeight)
+			}
+
+			// Sanitize filename
+			fileName := item.Name
+			if fileName == "" {
+				fileName = fmt.Sprintf("wallpaper-%s.png", item.ID)
+			}
+			if filepath.Ext(fileName) == "" {
+				fileName += ".png"
+			}
+
+			// Save input to temp file
+			tmpDir := ""
+			if a.coreBridge != nil {
+				tmpDir = a.coreBridge.TmpDir
+			}
+			if tmpDir == "" {
+				tmpDir = os.TempDir()
+			}
+
+			tmpInput := filepath.Join(tmpDir, fmt.Sprintf("batch-%s-input.png", item.ID))
+			if err := os.WriteFile(tmpInput, data, 0644); err != nil {
+				a.procMu.Lock()
+				a.procStatus.Items[i].Status = "error"
+				a.procStatus.Items[i].Error = err.Error()
+				a.procMu.Unlock()
+				a.emitProcessingStatus()
+				continue
+			}
+			// Ensure temporary input file is cleaned up when processing is done
+			defer os.Remove(tmpInput)
+
+			// Check core bridge availability after temp file is created and deferred for cleanup
+			if a.coreBridge == nil {
+				a.procMu.Lock()
+				a.procStatus.Items[i].Status = "error"
+				a.procStatus.Items[i].Error = "core bridge not initialized"
+				a.procMu.Unlock()
+				a.emitProcessingStatus()
+				continue
+			}
+
+			tmpOutput := filepath.Join(savePath, fileName)
+
+			opts := &types.ProcessingOptions{
+				TargetWidth:     targetWidth,
+				TargetHeight:    targetHeight,
+				ScaleFactor:     0,
+				MaxResolution:   16384,
+				KeepAspectRatio: false,
+			}
+
+			batchItems[i] = types.BatchItem{
+				InputPath:  tmpInput,
+				OutputPath: tmpOutput,
+				Options:    opts,
+			}
+		}
+
+		// Progress callback for UI
+		progressCallback := func(current, total int, item types.BatchItem) {
+			a.procMu.Lock()
+			a.procStatus.Current = current - 1
+			a.procStatus.Progress = int(float64(current) / float64(total) * 100)
+			if current-1 < len(a.procStatus.Items) {
+				a.procStatus.Items[current-1].Status = "processing"
+			}
 			a.procMu.Unlock()
 			a.emitProcessingStatus()
 		}
-	}()
-}
 
-// processOneItem handles downloading (if needed) and upscaling a single item
-func (a *App) processOneItem(item BatchItem, savePath string) error {
-	if a.upscaler == nil {
-		return fmt.Errorf("upscaler not initialized")
-	}
-
-	// Get base64 data: either provided directly or download from URL
-	base64Data := item.Base64Data
-	if base64Data == "" && item.DownloadURL != "" {
-		downloaded, err := a.DownloadImage(item.DownloadURL)
-		if err != nil {
-			return fmt.Errorf("failed to download image: %w", err)
+		// Call SweetDesk-core batch API
+		if a.coreBridge != nil {
+			_, err := a.coreBridge.ProcessBatch(batchItems, progressCallback)
+			if err != nil {
+				log.Printf("❌ Batch processing failed: %v", err)
+			}
 		}
-		base64Data = downloaded
-	}
-	if base64Data == "" {
-		return fmt.Errorf("no image data available for item %s", item.ID)
-	}
 
-	// Parse dimensions from "WIDTHxHEIGHT"
-	targetWidth, targetHeight := 3840, 2160
-	if item.Dimension != "" {
-		fmt.Sscanf(item.Dimension, "%dx%d", &targetWidth, &targetHeight)
-	}
-
-	// Sanitize filename
-	fileName := item.Name
-	if fileName == "" {
-		fileName = fmt.Sprintf("wallpaper-%s.png", item.ID)
-	}
-	if filepath.Ext(fileName) == "" {
-		fileName += ".png"
-	}
-
-	// Process via existing ProcessImage pipeline
-	_, err := a.ProcessImage(base64Data, targetWidth, targetHeight, savePath, fileName)
-	return err
+		// Mark all items as done
+		a.procMu.Lock()
+		for i := range a.procStatus.Items {
+			if a.procStatus.Items[i].Status == "processing" {
+				a.procStatus.Items[i].Status = "done"
+			}
+		}
+		a.procMu.Unlock()
+		a.emitProcessingStatus()
+	}()
 }
 
 // GetProcessingStatus returns the current batch processing state.
