@@ -191,7 +191,7 @@ jobs:
           fi
           
           echo "🔏 Ad-hoc signing the app bundle..."
-          codesign --force --deep --entitlements build/darwin/entitlements.plist -s - "$APP_PATH"
+          codesign --force --entitlements build/darwin/entitlements.plist -s - "$APP_PATH"
           
           echo "🔍 Verifying signature..."
           codesign -vv "$APP_PATH"
