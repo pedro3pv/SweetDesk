@@ -13,6 +13,7 @@ import (
 	ort "github.com/yalue/onnxruntime_go"
 	"golang.org/x/image/draw"
 
+	"pure-go-project/internal/providers"
 	"pure-go-project/internal/runtime"
 )
 
@@ -126,13 +127,34 @@ func NewUpscaler(modelType UpscalerType, modelDir string, onnxLibPath string) (*
 		return nil, fmt.Errorf("falha ao criar output tensor: %w", err)
 	}
 
-	u.session, err = ort.NewSession[float32](
-		u.modelPath,
-		[]string{u.inputName},
-		[]string{u.outputName},
-		[]*ort.Tensor[float32]{u.inputTensor},
-		[]*ort.Tensor[float32]{u.outputTensor},
+	// Detectar hardware disponível (usa singleton de providers)
+	hwConfig, err := providers.DetectHardware()
+	if err != nil {
+		log.Printf("⚠️  Erro ao detectar hardware: %v", err)
+		hwConfig = &providers.HardwareConfig{Provider: providers.ProviderCPU}
+	}
+
+	PrintHardwareInfo(hwConfig)
+
+	// Criar SessionOptions
+	sessionOptions, err := ort.NewSessionOptions()
+	if err != nil {
+		u.inputTensor.Destroy()
+		u.outputTensor.Destroy()
+		return nil, fmt.Errorf("falha ao criar session options: %w", err)
+	}
+	defer sessionOptions.Destroy()
+
+	// Obter prioridade de providers a partir da detecção
+	providerPriority := providers.GetProviderPriority(hwConfig)
+
+	// Tentar criar sessão com fallback entre providers
+	u.session, err = u.createSessionWithFallback(
+		providerPriority,
+		hwConfig,
+		sessionOptions,
 	)
+
 	if err != nil {
 		u.inputTensor.Destroy()
 		u.outputTensor.Destroy()
@@ -397,4 +419,89 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// HardwareConfig descreve capacidades relevantes para escolher providers
+// ProviderTipo identifica o provider preferencial
+type ProviderTipo string
+
+const (
+	ProviderCPU  ProviderTipo = "CPU"
+	ProviderCUDA ProviderTipo = "CUDA"
+)
+
+// HardwareConfig descreve capacidades relevantes para escolher providers
+type HardwareConfig struct {
+	Provider    ProviderTipo
+	UseCUDA     bool
+	DeviceID    int
+	MemoryLimit int64
+}
+
+// DetectHardware detecta (de forma simples) se CUDA está disponível.
+// Atualmente é uma implementação conservadora que pode ser estendida.
+func DetectHardware() (*HardwareConfig, error) {
+	// Implementação simples: desabilita CUDA por padrão.
+	// Futuramente podemos checar bibliotecas, variáveis de ambiente ou usar cuInit.
+	return &HardwareConfig{Provider: ProviderCPU, UseCUDA: false, DeviceID: 0, MemoryLimit: 0}, nil
+}
+
+// PrintHardwareInfo mostra um resumo do hardware detectado
+func PrintHardwareInfo(h *providers.HardwareConfig) {
+	if h == nil {
+		log.Println("Hardware: nenhum dado disponível")
+		return
+	}
+	log.Printf("Hardware: Provider=%s DeviceID=%d MemLimit=%d", h.Provider, h.DeviceID, h.MemoryLimit)
+}
+
+func (u *Upscaler) createSessionWithFallback(
+	provList []providers.ProviderType,
+	hwConfig *providers.HardwareConfig,
+	sessionOptions *ort.SessionOptions,
+) (*ort.Session[float32], error) {
+	var lastErr error
+
+	for _, provider := range provList {
+		log.Printf("🔧 Tentando provider: %s", provider)
+
+		// Configurar provider específico
+		if provider == providers.ProviderCoreML {
+			// CoreML requer options
+			err := sessionOptions.AppendExecutionProvider(string(provider), hwConfig.Options)
+			if err != nil {
+				log.Printf("⚠️  Falha ao configurar CoreML: %v", err)
+				lastErr = err
+				continue
+			}
+		} else if provider == providers.ProviderCUDA {
+			// CUDA requer options
+			err := sessionOptions.AppendExecutionProvider(string(provider), hwConfig.Options)
+			if err != nil {
+				log.Printf("⚠️  Falha ao configurar CUDA: %v", err)
+				lastErr = err
+				continue
+			}
+		}
+		// CPU não precisa de configuração especial
+
+		// Tentar criar sessão
+		session, err := ort.NewSession[float32](
+			u.modelPath,
+			[]string{u.inputName},
+			[]string{u.outputName},
+			[]*ort.Tensor[float32]{u.inputTensor},
+			[]*ort.Tensor[float32]{u.outputTensor},
+		)
+
+		if err == nil {
+			log.Printf("✅ Usando %s com sucesso!", provider)
+			return session, nil
+		}
+
+		log.Printf("❌ %s falhou: %v", provider, err)
+		lastErr = err
+	}
+
+	return nil, fmt.Errorf("todos os providers falharam. Último erro: %w", lastErr)
 }

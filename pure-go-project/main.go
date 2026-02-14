@@ -14,7 +14,7 @@ import (
 
 func main() {
 	modelDir := "./models"
-	onnxLibPath := "/opt/homebrew/lib/libonnxruntime.dylib"
+	onnxLibPath := "/Users/pedro3pv/Documents/GitHub/SweetDesk/pure-go-project/onnxruntime-osx-arm64-1.24.1/lib/libonnxruntime.dylib"
 	inputImage := "test_img_1.jpg"
 
 	// Inicializa ONNX Runtime uma vez no início
