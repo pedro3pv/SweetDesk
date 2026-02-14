@@ -35,7 +35,8 @@ func NewCoreBridge(ctx context.Context) (*CoreBridge, error) {
 // ClassifyImage classifies an image by type.
 // Returns the detected type ("photo" or "anime") and a confidence score.
 func (cb *CoreBridge) ClassifyImage(imageData []byte) (string, float32, error) {
-	// Default classification: photo with full confidence
+	// Stub: returns "photo" as default until SweetDesk-core classifier is available.
+	// Callers should treat this as a best-effort fallback.
 	return "photo", 1.0, nil
 }
 
