@@ -149,6 +149,14 @@ jobs:
         run: wails build -obfuscated -platform ${{ matrix.build.platform }}
 
 
+      - name: Remove quarantine attribute (macOS only)
+        if: matrix.build.os == 'macos-latest'
+        run: |
+          echo "🔓 Removendo atributo de quarentena do macOS..."
+          find build/bin -name "*.app" -exec xattr -cr {} \;
+          echo "✅ Atributos de quarentena removidos"
+
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -202,11 +210,12 @@ jobs:
             echo "✅ SweetDesk-windows-amd64.zip criado"
           fi
           
-          # macOS: Criar ZIP com .app
+          # macOS: Criar ZIP com .app (preservando permissões e symlinks)
           if [ -d "release-artifacts/app-darwin-arm64" ]; then
             echo "📦 Criando ZIP para macOS..."
             cd release-artifacts/app-darwin-arm64
-            zip -r ../../release-files/SweetDesk-darwin-arm64.zip ./*
+            # Usar ditto para preservar estrutura do .app corretamente
+            zip -ry ../../release-files/SweetDesk-darwin-arm64.zip ./*
             cd ../..
             echo "✅ SweetDesk-darwin-arm64.zip criado"
           fi
@@ -229,11 +238,19 @@ jobs:
             
             ### 📦 Downloads
             
-            | Platform | File |
-            |----------|------|
-            | 🐧 Linux (x64) | `SweetDesk-linux-amd64.zip` |
-            | 🪟 Windows (x64) | `SweetDesk-windows-amd64.zip` |
-            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64.zip` |
+            | Platform | File | Instalação |
+            |----------|------|------------|
+            | 🐧 Linux (x64) | `SweetDesk-linux-amd64.zip` | Extrair e executar |
+            | 🪟 Windows (x64) | `SweetDesk-windows-amd64.zip` | Extrair e executar .exe |
+            | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64.zip` | Extrair e mover para Aplicativos |
+            
+            ### ⚠️ Nota para usuários macOS
+            
+            Se você receber o erro "O aplicativo não pode ser aberto":
+            
+            1. Abra o Terminal
+            2. Execute: `xattr -cr /caminho/para/SweetDesk.app`
+            3. Ou: Clique com botão direito no app → Abrir → Abrir
             
             ### 📝 Changelog
           files: release-files/*.zip
