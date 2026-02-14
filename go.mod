@@ -2,7 +2,10 @@ module SweetDesk
 
 go 1.24.0
 
-require github.com/wailsapp/wails/v2 v2.11.0
+require (
+	github.com/wailsapp/wails/v2 v2.11.0
+	github.com/pedro3pv/SweetDesk-core v0.0.0-20260214000000-000000000000
+)
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect
@@ -23,6 +26,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/samber/lo v1.49.1 // indirect
+	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
@@ -36,4 +40,5 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 )
 
-// replace github.com/wailsapp/wails/v2 v2.11.0 => /Users/pedro3pv/go/pkg/mod
+// Uncomment to use local development version
+// replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core
