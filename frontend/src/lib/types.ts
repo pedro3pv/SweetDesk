@@ -21,15 +21,6 @@ export interface DownloadItem {
     selected: boolean;
 }
 
-export type AppView =
-    | 'search'
-    | 'upload'
-    | 'image-detail'
-    | 'download-list'
-    | 'folder-select'
-    | 'processing'
-    | 'complete';
-
 export interface FilterState {
     aspect: string;
     dimensions: string;

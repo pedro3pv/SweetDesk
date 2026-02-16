@@ -2,6 +2,8 @@ import React from "react"
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { AppProvider } from "../contexts/AppContext";
+import Header from "../components/Header";
 
 const geistSans = localFont({
     src: "./fonts/GeistVF.woff",
@@ -33,7 +35,14 @@ export default function RootLayout({
             <body
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
             >
-                {children}
+                <AppProvider>
+                    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+                        <Header />
+                        <main className="flex-1 flex overflow-hidden">
+                            {children}
+                        </main>
+                    </div>
+                </AppProvider>
             </body>
         </html>
     );

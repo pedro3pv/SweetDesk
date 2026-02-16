@@ -150,8 +150,12 @@ export default function ProcessingView({ items, savePath, onComplete }: Processi
             const ps = args[0] as ProcessingStatus;
             applyStatus(ps);
         }
-
-        // EventsOn returns a cancel function
+        // Only setup event listener if EventsOn is available (Wails runtime loaded)
+        if (typeof EventsOn !== 'function') {
+            console.warn('⚠️ Wails runtime not available yet, EventsOn listener not registered');
+            return;
+        }
+                // EventsOn returns a cancel function
         const cancel = EventsOn('processing:status', handleEvent);
         return () => { cancel(); };
     }, []);

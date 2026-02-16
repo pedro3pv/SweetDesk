@@ -13,14 +13,28 @@ export default function FolderSelect({ onSelect, onCancel }: FolderSelectProps) 
 
     // On mount, try to get the default save path from backend
     useEffect(() => {
+        console.log('🔧 FolderSelect montado');
+        console.log('🔍 window.go disponível?', !!window.go);
+        console.log('🔍 window.go.main disponível?', !!window.go?.main);
+        console.log('🔍 window.go.main.App disponível?', !!window.go?.main?.App);
+        console.log('🔍 SelectDirectory disponível?', !!window.go?.main?.App?.SelectDirectory);
+        
         async function loadDefault() {
             try {
                 if (window.go?.main?.App?.GetDefaultSavePath) {
+                    console.log('📂 Tentando carregar pasta padrão...');
                     const defaultPath = await window.go.main.App.GetDefaultSavePath();
-                    if (defaultPath) setSelectedPath(defaultPath);
+                    if (defaultPath) {
+                        console.log('✅ Pasta padrão carregada:', defaultPath);
+                        setSelectedPath(defaultPath);
+                    } else {
+                        console.log('⚠️ GetDefaultSavePath retornou vazio');
+                    }
+                } else {
+                    console.log('⚠️ GetDefaultSavePath não disponível');
                 }
-            } catch {
-                // ignore - will show empty
+            } catch (err) {
+                console.error('❌ Erro ao carregar pasta padrão:', err);
             }
         }
         loadDefault();
@@ -28,19 +42,29 @@ export default function FolderSelect({ onSelect, onCancel }: FolderSelectProps) 
 
     const handleBrowse = async () => {
         setIsLoading(true);
+        console.log('🔍 Tentando abrir diálogo de seleção de pasta...');
+        
         try {
-            if (window.go?.main?.App?.SelectDirectory) {
-                const result = await window.go.main.App.SelectDirectory();
-                if (result) {
-                    setSelectedPath(result);
-                }
+            if (!window.go?.main?.App?.SelectDirectory) {
+                console.error('❌ SelectDirectory não está disponível no window.go');
+                alert('Erro: Funcionalidade de seleção de pasta não disponível. Verifique se o app Wails está rodando.');
+                return;
+            }
+
+            console.log('✅ SelectDirectory disponível, chamando...');
+            const result = await window.go.main.App.SelectDirectory();
+            console.log('📁 Resultado do diálogo:', result);
+            
+            if (result) {
+                console.log('✅ Pasta selecionada:', result);
+                setSelectedPath(result);
             } else {
-                // Fallback: prompt for path if native dialog not available
-                const path = prompt('Digite o caminho da pasta:', selectedPath);
-                if (path) setSelectedPath(path);
+                console.log('⚠️ Usuário cancelou ou nenhuma pasta selecionada');
             }
         } catch (err) {
-            console.error('Failed to open directory dialog:', err);
+            console.error('❌ Erro ao abrir diálogo de pasta:', err);
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            alert(`Erro ao abrir seletor de pasta: ${errorMsg}`);
         } finally {
             setIsLoading(false);
         }
