@@ -90,6 +90,12 @@ export function useProcessing(): UseProcessingResult {
 
     // Listen for progress events from backend
     useEffect(() => {
+        // Only setup event listener if EventsOn is available (Wails runtime loaded)
+        if (typeof EventsOn !== 'function') {
+            console.warn('⚠️ Wails runtime not available yet, EventsOn listener not registered');
+            return;
+        }
+        
         const cancel = EventsOn('processing:status', (...args: unknown[]) => {
             const ps = args[0] as ProcessingStatus;
             applyStatus(ps);
