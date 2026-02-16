@@ -1,5 +1,6 @@
 name: Wails Build & Release (Bun)
 
+
 on:
   push:
     tags:
@@ -11,14 +12,17 @@ on:
         required: false
         type: string
 
+
 # Adicione permissões ao GITHUB_TOKEN
 permissions:
   contents: write
   packages: read
 
+
 env:
   NODE_OPTIONS: "--max-old-space-size=4096"
   BUN_VERSION: "1.1.13"
+
 
 jobs:
   build:
@@ -39,12 +43,14 @@ jobs:
             os: 'macos-latest'
             artifact: 'app-darwin-arm64'
 
+
     runs-on: ${{ matrix.build.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
 
       - name: Clone SweetDesk-core
         shell: bash
@@ -53,6 +59,7 @@ jobs:
           # Usa PAT_TOKEN para clonar repositório privado
           git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/pedro3pv/SweetDesk-core.git
           ls -la
+
 
       - name: Verify SweetDesk-core cloned
         shell: bash
@@ -63,6 +70,7 @@ jobs:
           fi
           echo "✅ SweetDesk-core found at ../SweetDesk-core"
           ls -la ../SweetDesk-core
+
 
       - name: Enable local SweetDesk-core replace directive
         shell: bash
@@ -75,10 +83,12 @@ jobs:
           fi
           cat go.mod | grep "replace"
 
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+
 
       - name: Clean and Install dependencies with Bun
         working-directory: frontend
@@ -87,21 +97,23 @@ jobs:
           # Remove node_modules e cache customizado se existir
           rm -rf node_modules
           rm -rf ../bun-install-cache
-          
+
           # Limpar cache do Bun
           bun pm cache rm
-          
+
           # Reinstalar sem cache customizado
           bun install --no-cache
-          
+
           # Adicionar tipos faltantes
           bun add -d @types/gensync
+
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
+
 
       - name: Install Linux dependencies
         if: matrix.build.os == 'ubuntu-latest'
@@ -111,222 +123,164 @@ jobs:
           # Criar symlink para webkit2gtk-4.0 apontar para 4.1
           sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc
 
+
       - name: Tidy Go modules
         run: go mod tidy
 
-      - name: Generate code in SweetDesk-core
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd ../SweetDesk-core
-          go generate ./...
+
+      # DESATIVADO: Generate code in SweetDesk-core
+      # - name: Generate code in SweetDesk-core
+      #   shell: bash
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     cd ../SweetDesk-core
+      #     go generate ./...
+
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      - name: Install Garble (for obfuscation)
-        run: go install mvdan.cc/garble@latest
 
-      - name: Build Wails with Bun (Obfuscated)
-        run: wails build -obfuscated -platform ${{ matrix.build.platform }}
+      # REMOVIDO para macOS: Instalação do Garble (não necessário para build debug)
+      # - name: Install Garble (for obfuscation)
+      #   if: matrix.build.os != 'macos-latest'
+      #   run: go install mvdan.cc/garble@latest
 
-      - name: Rename production build (macOS)
+
+      - name: Build Wails with Bun
+        if: matrix.build.os != 'macos-latest'
+        run: wails build -platform ${{ matrix.build.platform }}
+
+
+      # Build debug como build principal para macOS
+      - name: Build Wails (Debug mode - macOS)
         if: matrix.build.os == 'macos-latest'
         run: |
-          echo "📝 Renomeando build de produção..."
-          APP_PATH=$(find build/bin -name "*.app" -type d -maxdepth 1 | head -n 1)
-          if [ -n "$APP_PATH" ]; then
-            APP_NAME=$(basename "$APP_PATH" .app)
-            mv "$APP_PATH" "build/bin/${APP_NAME}-production.app"
-            echo "✅ Renomeado para ${APP_NAME}-production.app"
-          fi
-
-      - name: Build Wails (Debug mode)
-        if: matrix.build.os == 'macos-latest'
-        run: |
-          echo "🔧 Construindo versão debug..."
+          echo "🔧 Construindo versão debug para macOS..."
           wails build -debug -platform ${{ matrix.build.platform }}
           echo "✅ Build debug concluído"
 
-      - name: Organize debug and production builds (macOS)
-        if: matrix.build.os == 'macos-latest'
-        run: |
-          echo "📦 Organizando builds..."
-          
-          # Encontrar o debug build (recém criado)
-          DEBUG_APP=$(find build/bin -name "*.app" -type d -maxdepth 1 | head -n 1)
-          if [ -n "$DEBUG_APP" ]; then
-            APP_NAME=$(basename "$DEBUG_APP" .app)
-            mv "$DEBUG_APP" "build/bin/${APP_NAME}-debug.app"
-            echo "✅ Debug build: ${APP_NAME}-debug.app"
-          fi
-          
-          # Restaurar nome original do production build
-          PROD_APP=$(find build/bin -name "*-production.app" -type d -maxdepth 1 | head -n 1)
-          if [ -n "$PROD_APP" ]; then
-            APP_NAME=$(basename "$PROD_APP" -production.app)
-            mv "$PROD_APP" "build/bin/${APP_NAME}.app"
-            echo "✅ Production build: ${APP_NAME}.app"
-          fi
-          
-          echo "📂 Builds disponíveis:"
-          ls -lh build/bin/
 
       - name: Verify and prepare macOS build
         if: matrix.build.os == 'macos-latest'
         run: |
           echo "🔍 Verificando build do macOS..."
-          
+
           # Encontrar o .app
           APP_PATH=$(find build/bin -name "*.app" -type d -maxdepth 1 | head -n 1)
-          
+
           if [ -z "$APP_PATH" ]; then
             echo "❌ Nenhum arquivo .app encontrado"
             exit 1
           fi
-          
+
           echo "✅ Encontrado: $APP_PATH"
-          
+
           # Verificar estrutura do bundle
           if [ ! -d "$APP_PATH/Contents" ]; then
             echo "❌ Estrutura do .app inválida (falta Contents/)"
             exit 1
           fi
-          
+
           if [ ! -d "$APP_PATH/Contents/MacOS" ]; then
             echo "❌ Estrutura do .app inválida (falta Contents/MacOS/)"
             exit 1
           fi
-          
+
           if [ ! -f "$APP_PATH/Contents/Info.plist" ]; then
             echo "❌ Estrutura do .app inválida (falta Contents/Info.plist)"
             exit 1
           fi
-          
+
           echo "✅ Estrutura do bundle válida"
-          
+
           # Listar estrutura
           echo "📂 Estrutura do bundle:"
           ls -lah "$APP_PATH/Contents/"
-          
+
           # Remover atributos de quarentena
           echo "🔓 Removendo atributos de quarentena..."
           xattr -cr "$APP_PATH"
           echo "✅ Atributos removidos"
-          
+
           # Verificar permissões executáveis
           echo "🔐 Verificando permissões..."
           chmod +x "$APP_PATH/Contents/MacOS/"*
           echo "✅ Permissões configuradas"
 
-      - name: Ad-hoc sign macOS apps (Production & Debug)
+
+      - name: Ad-hoc sign macOS app
         if: matrix.build.os == 'macos-latest'
         run: |
-          # Função para assinar um app com hardened runtime
-          sign_app() {
-            local APP_PATH="$1"
-            local APP_TYPE="$2"
-            
-            echo "🔏 Signing $APP_TYPE: $(basename "$APP_PATH")..."
-            
-            # Sign internal frameworks/dylibs first if they exist
-            # --options runtime é necessário para NSOpenPanel funcionar (file dialogs)
-            if [ -d "$APP_PATH/Contents/Frameworks" ]; then
-              echo "  📚 Signing frameworks and libraries..."
-              find "$APP_PATH/Contents/Frameworks" -name "*.dylib" -exec codesign --force --options runtime -s - {} \;
-              find "$APP_PATH/Contents/Frameworks" -name "*.framework" -exec codesign --force --options runtime -s - {} \;
-            fi
-            
-            # Sign the app bundle with entitlements and hardened runtime
-            # --deep garante signing recursivo completo
-            # --options runtime ativa hardened runtime (necessário para permissões de file system)
-            echo "  🔏 Signing app bundle with entitlements..."
-            codesign --force --deep --options runtime --entitlements build/darwin/entitlements.plist -s - "$APP_PATH"
-            
-            # Verify signature
-            echo "  🔍 Verifying signature..."
-            codesign -vv "$APP_PATH"
-            
-            # Verify entitlements were applied
-            echo "  🔍 Verifying entitlements..."
-            codesign -d --entitlements - "$APP_PATH" | grep -q "com.apple.security.files.user-selected" && echo "  ✅ File access entitlement present"
-            
-            # Verify hardened runtime
-            echo "  🔍 Verifying hardened runtime..."
-            codesign -d --verbose=4 "$APP_PATH" 2>&1 | grep -q "runtime" && echo "  ✅ Hardened runtime enabled"
-            
-            echo "✅ $APP_TYPE signing complete"
-          }
-          
-          # Assinar production build
-          PROD_APP=$(find build/bin -name "*.app" -type d -maxdepth 1 ! -name "*-debug.app" | head -n 1)
-          if [ -n "$PROD_APP" ]; then
-            sign_app "$PROD_APP" "Production"
+          APP_PATH=$(find build/bin -name "*.app" -type d -maxdepth 1 | head -n 1)
+
+          echo "🔏 Signing $(basename "$APP_PATH")..."
+
+          # Sign internal frameworks/dylibs first if they exist
+          # --options runtime é necessário para NSOpenPanel funcionar (file dialogs)
+          if [ -d "$APP_PATH/Contents/Frameworks" ]; then
+            echo "  📚 Signing frameworks and libraries..."
+            find "$APP_PATH/Contents/Frameworks" -name "*.dylib" -exec codesign --force --options runtime -s - {} \;
+            find "$APP_PATH/Contents/Frameworks" -name "*.framework" -exec codesign --force --options runtime -s - {} \;
           fi
-          
-          # Assinar debug build
-          DEBUG_APP=$(find build/bin -name "*-debug.app" -type d -maxdepth 1 | head -n 1)
-          if [ -n "$DEBUG_APP" ]; then
-            sign_app "$DEBUG_APP" "Debug"
-          fi
-          
-          echo "✅ All apps signed successfully"
+
+          # Sign the app bundle with entitlements and hardened runtime
+          # --deep garante signing recursivo completo
+          # --options runtime ativa hardened runtime (necessário para permissões de file system)
+          echo "  🔏 Signing app bundle with entitlements..."
+          codesign --force --deep --options runtime --entitlements build/darwin/entitlements.plist -s - "$APP_PATH"
+
+          # Verify signature
+          echo "  🔍 Verifying signature..."
+          codesign -vv "$APP_PATH"
+
+          # Verify entitlements were applied
+          echo "  🔍 Verifying entitlements..."
+          codesign -d --entitlements - "$APP_PATH" | grep -q "com.apple.security.files.user-selected" && echo "  ✅ File access entitlement present"
+
+          # Verify hardened runtime
+          echo "  🔍 Verifying hardened runtime..."
+          codesign -d --verbose=4 "$APP_PATH" 2>&1 | grep -q "runtime" && echo "  ✅ Hardened runtime enabled"
+
+          echo "✅ App signing complete"
+
 
       - name: Create DMG (macOS only)
         if: matrix.build.os == 'macos-latest'
         run: |
           # Install create-dmg
           brew install create-dmg
-          
-          # Função para criar DMG
-          create_dmg_for_app() {
-            local APP_PATH="$1"
-            local DMG_SUFFIX="$2"
-            local APP_NAME=$(basename "$APP_PATH" .app)
-            local BASE_NAME=$(echo "$APP_NAME" | sed 's/-debug$//')
-            
-            echo "📦 Creating DMG for $APP_NAME..."
-            
-            create-dmg \
-              --volname "$BASE_NAME" \
-              --window-pos 200 120 \
-              --window-size 600 400 \
-              --icon-size 100 \
-              --icon "$APP_NAME.app" 150 190 \
-              --app-drop-link 450 190 \
-              --no-internet-enable \
-              "build/bin/${BASE_NAME}-darwin-arm64${DMG_SUFFIX}.dmg" \
-              "$APP_PATH" || echo "⚠️  Warning: DMG creation had issues, but continuing..."
-            
-            if [ -f "build/bin/${BASE_NAME}-darwin-arm64${DMG_SUFFIX}.dmg" ]; then
-              echo "✅ DMG created: build/bin/${BASE_NAME}-darwin-arm64${DMG_SUFFIX}.dmg"
-            fi
-          }
-          
-          # Criar DMG para production build
-          PROD_APP=$(find build/bin -name "*.app" -type d -maxdepth 1 ! -name "*-debug.app" | head -n 1)
-          if [ -n "$PROD_APP" ]; then
-            create_dmg_for_app "$PROD_APP" ""
+
+          APP_PATH=$(find build/bin -name "*.app" -type d -maxdepth 1 | head -n 1)
+          APP_NAME=$(basename "$APP_PATH" .app)
+
+          echo "📦 Creating DMG for $APP_NAME..."
+
+          create-dmg \
+            --volname "$APP_NAME" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "$APP_NAME.app" 150 190 \
+            --app-drop-link 450 190 \
+            --no-internet-enable \
+            "build/bin/${APP_NAME}-darwin-arm64.dmg" \
+            "$APP_PATH" || echo "⚠️  Warning: DMG creation had issues, but continuing..."
+
+          if [ -f "build/bin/${APP_NAME}-darwin-arm64.dmg" ]; then
+            echo "✅ DMG created: build/bin/${APP_NAME}-darwin-arm64.dmg"
+            ls -lah build/bin/*.dmg
           fi
-          
-          # Criar DMG para debug build
-          DEBUG_APP=$(find build/bin -name "*-debug.app" -type d -maxdepth 1 | head -n 1)
-          if [ -n "$DEBUG_APP" ]; then
-            create_dmg_for_app "$DEBUG_APP" "-debug"
-          fi
-          
-          echo "📦 DMGs disponíveis:"
-          ls -lah build/bin/*.dmg
+
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.build.artifact }}
-          # Para macOS: inclui ambos DMGs (production e debug)
-          # Debug build útil para troubleshooting durante fase alpha
           path: |
             ${{ matrix.build.os == 'macos-latest' && 'build/bin/*.dmg' || 'build/bin/*' }}
+
 
   create-release:
     needs: build
@@ -338,20 +292,23 @@ jobs:
         with:
           fetch-depth: 0
 
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
+
 
       - name: Display structure of downloaded files
         run: |
           echo "📦 Estrutura dos arquivos baixados:"
           ls -laR release-artifacts/
 
+
       - name: Prepare and package release files
         run: |
           mkdir -p release-files
-          
+
           # Linux: Criar ZIP com binário
           if [ -d "release-artifacts/app-linux-amd64" ]; then
             echo "📦 Criando ZIP para Linux..."
@@ -359,12 +316,12 @@ jobs:
             zip -r ../../release-files/SweetDesk-linux-amd64.zip ./*
             cd ../..
             echo "✅ SweetDesk-linux-amd64.zip criado"
-            
+
             # Verificar integridade
             echo "🔍 Verificando ZIP Linux..."
             unzip -l release-files/SweetDesk-linux-amd64.zip | head -n 10
           fi
-          
+
           # Windows: Criar ZIP com .exe
           if [ -d "release-artifacts/app-windows-amd64.exe" ]; then
             echo "📦 Criando ZIP para Windows..."
@@ -372,35 +329,36 @@ jobs:
             zip -r ../../release-files/SweetDesk-windows-amd64.zip ./*
             cd ../..
             echo "✅ SweetDesk-windows-amd64.zip criado"
-            
+
             # Verificar integridade
             echo "🔍 Verificando ZIP Windows..."
             unzip -l release-files/SweetDesk-windows-amd64.zip | head -n 10
           fi
-          
+
           # macOS: O DMG já está pronto
           if [ -d "release-artifacts/app-darwin-arm64" ]; then
             echo "📦 Preparando DMG para macOS..."
-            
+
             # Encontrar o arquivo .dmg
             DMG_PATH=$(find release-artifacts/app-darwin-arm64 -name "*.dmg" -maxdepth 1 | head -n 1)
-            
+
             if [ -z "$DMG_PATH" ]; then
               echo "❌ Nenhum arquivo .dmg encontrado"
               ls -la release-artifacts/app-darwin-arm64/
               exit 1
             fi
-            
+
             cp "$DMG_PATH" release-files/SweetDesk-darwin-arm64.dmg
             echo "✅ SweetDesk-darwin-arm64.dmg copiado"
           fi
-          
+
           echo ""
           echo "📋 Arquivos preparados para release:"
           ls -lah release-files/
           echo ""
           echo "📊 Tamanho dos arquivos:"
           du -h release-files/*
+
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -409,29 +367,33 @@ jobs:
           name: Release ${{ github.event.inputs.tag || github.ref_name }}
           body: |
             ## 🎉 SweetDesk ${{ github.event.inputs.tag || github.ref_name }}
-            
+
             ### 📦 Downloads
-            
+
             | Platform | File | Instalação |
             |----------|------|------------|
             | 🐧 Linux (x64) | `SweetDesk-linux-amd64.zip` | Extrair e executar |
             | 🪟 Windows (x64) | `SweetDesk-windows-amd64.zip` | Extrair e executar .exe |
             | 🍎 macOS (ARM64) | `SweetDesk-darwin-arm64.dmg` | Abrir DMG e arrastar para Aplicativos |
-            
+
             ### ⚠️ Nota para usuários macOS
-            
+
             **O app é assinado com ad-hoc signing.** Na primeira execução:
-            
+
             1. **Abrir o DMG** e arrastar o SweetDesk para a pasta Aplicativos
             2. **Primeira execução:** Clique com botão direito no app → **Abrir** → **Abrir**
             3. Ou vá em **Configurações do Sistema → Privacidade e Segurança** e permita o app
-            
+
             O app pedirá permissão para acessar pastas (Imagens, Downloads, etc.) na primeira vez que salvar arquivos.
-            
+
+            ### 🔧 Versão de Desenvolvimento
+
+            **macOS:** Esta versão é compilada em modo debug para facilitar troubleshooting durante a fase alpha.
+
             ### 🐛 Problemas conhecidos
-            
+
             - **macOS Gatekeeper**: Apps não assinados oficialmente podem exibir avisos de segurança na primeira execução
-            
+
             ### 📝 Changelog
           files: release-files/*
           generate_release_notes: true
