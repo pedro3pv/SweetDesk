@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/pedro3pv/SweetDesk-core/pkg/types"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -292,9 +293,6 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 	}
 	a.procMu.Unlock()
 
-	// Emit initial status
-	a.emitProcessingStatus()
-
 	// Process in a goroutine so the binding returns immediately
 	go func() {
 		defer func() {
@@ -305,6 +303,10 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 			a.procMu.Unlock()
 			a.emitProcessingStatus()
 		}()
+
+		// Small delay to ensure frontend has registered event listeners
+		time.Sleep(100 * time.Millisecond)
+		a.emitProcessingStatus()
 
 		// Prepare batch items for SweetDesk-core
 		batchItems := make([]types.BatchItem, len(items))
@@ -317,6 +319,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 					a.procMu.Lock()
 					a.procStatus.Items[i].Status = "error"
 					a.procStatus.Items[i].Error = err.Error()
+					a.recalcProgress()
 					a.procMu.Unlock()
 					a.emitProcessingStatus()
 					continue
@@ -327,6 +330,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 				a.procMu.Lock()
 				a.procStatus.Items[i].Status = "error"
 				a.procStatus.Items[i].Error = "no image data available"
+				a.recalcProgress()
 				a.procMu.Unlock()
 				a.emitProcessingStatus()
 				continue
@@ -337,6 +341,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 				a.procMu.Lock()
 				a.procStatus.Items[i].Status = "error"
 				a.procStatus.Items[i].Error = err.Error()
+				a.recalcProgress()
 				a.procMu.Unlock()
 				a.emitProcessingStatus()
 				continue
@@ -371,6 +376,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 				a.procMu.Lock()
 				a.procStatus.Items[i].Status = "error"
 				a.procStatus.Items[i].Error = err.Error()
+				a.recalcProgress()
 				a.procMu.Unlock()
 				a.emitProcessingStatus()
 				continue
@@ -383,6 +389,7 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 				a.procMu.Lock()
 				a.procStatus.Items[i].Status = "error"
 				a.procStatus.Items[i].Error = "core bridge not initialized"
+				a.recalcProgress()
 				a.procMu.Unlock()
 				a.emitProcessingStatus()
 				continue
@@ -405,14 +412,16 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 			}
 		}
 
-		// Progress callback for UI
+		// Progress callback for UI — current is 1-indexed from SweetDesk-core
 		progressCallback := func(current, total int, item types.BatchItem) {
 			a.procMu.Lock()
-			a.procStatus.Current = current - 1
-			a.procStatus.Progress = int(float64(current) / float64(total) * 100)
-			if current-1 < len(a.procStatus.Items) {
-				a.procStatus.Items[current-1].Status = "processing"
+			idx := current - 1 // convert to 0-indexed
+			a.procStatus.Current = idx
+			if idx >= 0 && idx < len(a.procStatus.Items) {
+				a.procStatus.Items[idx].Status = "processing"
 			}
+			// Calculate progress based on completed items (done + error)
+			a.recalcProgress()
 			a.procMu.Unlock()
 			a.emitProcessingStatus()
 		}
@@ -425,13 +434,14 @@ func (a *App) ProcessBatch(items []BatchItem, savePath string) {
 			}
 		}
 
-		// Mark all items as done
+		// Mark remaining non-error items as done
 		a.procMu.Lock()
 		for i := range a.procStatus.Items {
-			if a.procStatus.Items[i].Status == "processing" {
+			if a.procStatus.Items[i].Status == "processing" || a.procStatus.Items[i].Status == "pending" {
 				a.procStatus.Items[i].Status = "done"
 			}
 		}
+		a.recalcProgress()
 		a.procMu.Unlock()
 		a.emitProcessingStatus()
 	}()
@@ -448,6 +458,22 @@ func (a *App) GetProcessingStatus() ProcessingStatus {
 	copy(itemsCopy, a.procStatus.Items)
 	status.Items = itemsCopy
 	return status
+}
+
+// recalcProgress recalculates progress based on completed items.
+// Must be called with procMu held.
+func (a *App) recalcProgress() {
+	if a.procStatus.Total == 0 {
+		a.procStatus.Progress = 100
+		return
+	}
+	completed := 0
+	for _, item := range a.procStatus.Items {
+		if item.Status == "done" || item.Status == "error" {
+			completed++
+		}
+	}
+	a.procStatus.Progress = int(float64(completed) / float64(a.procStatus.Total) * 100)
 }
 
 // emitProcessingStatus sends the current status to the frontend via Wails events
