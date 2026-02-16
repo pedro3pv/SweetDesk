@@ -109,6 +109,7 @@ func (a *App) shutdown(ctx context.Context) {
 
 // SelectDirectory opens the native OS directory picker dialog
 func (a *App) SelectDirectory() (string, error) {
+	log.Println("🔍 SelectDirectory called")
 	defaultDir := ""
 	home, err := os.UserHomeDir()
 	if err == nil {
@@ -121,14 +122,18 @@ func (a *App) SelectDirectory() (string, error) {
 			defaultDir = filepath.Join(home, "Pictures")
 		}
 	}
+	log.Printf("📂 Default directory: %s", defaultDir)
 
+	log.Println("🔓 Opening directory dialog...")
 	result, err := wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
 		Title:            "Selecionar pasta para salvar",
 		DefaultDirectory: defaultDir,
 	})
 	if err != nil {
+		log.Printf("❌ Error opening directory dialog: %v", err)
 		return "", fmt.Errorf("failed to open directory dialog: %w", err)
 	}
+	log.Printf("✅ User selected: %s", result)
 	return result, nil
 }
 
