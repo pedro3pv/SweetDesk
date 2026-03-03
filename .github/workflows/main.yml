@@ -57,7 +57,7 @@ jobs:
         run: |
           cd ..
           # Usa PAT_TOKEN para clonar repositório privado
-          git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/pedro3pv/SweetDesk-core.git
+          git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/Molasses-Co/SweetDesk-core.git
           ls -la
 
 
