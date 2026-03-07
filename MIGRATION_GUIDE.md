@@ -58,14 +58,14 @@ require (
 ```go
 require (
     github.com/wailsapp/wails/v2 v2.11.0
-    github.com/pedro3pv/SweetDesk-core v0.0.0-latest
+    github.com/Molasses-Co/SweetDesk-core v0.0.0-latest
 )
 ```
 
 **Steps:**
 ```bash
 # 1. Update go.mod
-go get -u github.com/pedro3pv/SweetDesk-core
+go get -u github.com/Molasses-Co/SweetDesk-core
 
 # 2. Tidy dependencies
 go mod tidy
@@ -431,7 +431,7 @@ wails dev
 
 ```bash
 # Solution: Download dependency
-go get -u github.com/pedro3pv/SweetDesk-core
+go get -u github.com/Molasses-Co/SweetDesk-core
 go mod tidy
 ```
 
@@ -494,7 +494,7 @@ go mod tidy
 
 For issues during migration:
 
-1. Check [SweetDesk-Core README](https://github.com/pedro3pv/SweetDesk-core)
+1. Check [SweetDesk-Core README](https://github.com/Molasses-Co/SweetDesk-core)
 2. Review example in `pkg/examples`
 3. Check existing GitHub issues
 4. Open a new issue with details

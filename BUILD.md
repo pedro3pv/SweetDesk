@@ -190,7 +190,7 @@ cd SweetDesk
 
 # Edit go.mod
 # Add or uncomment:
-# replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core
+# replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core
 
 go mod tidy
 ```

@@ -11,7 +11,7 @@
 
 ## 📸 O Que É SweetDesk?
 
-**SweetDesk** é uma aplicação desktop multiplataforma que transforma wallpapers de **baixa/média resolução** em **imagens 4K (3840×2160)** usando **inteligência artificial**. O projeto combina [**SweetDesk-core**](https://github.com/pedro3pv/SweetDesk-core) (motor de processamento em Go) com uma interface moderna em Next.js + React.
+**SweetDesk** é uma aplicação desktop multiplataforma que transforma wallpapers de **baixa/média resolução** em **imagens 4K (3840×2160)** usando **inteligência artificial**. O projeto combina [**SweetDesk-core**](https://github.com/Molasses-Co/SweetDesk-core) (motor de processamento em Go) com uma interface moderna em Next.js + React.
 
 ### Principais Recursos Implementados:
 
@@ -47,7 +47,7 @@
        ↓
 ┌─────────────────────────────────────────────┐
 │   SweetDesk-core v0.0.4 (Go Module)         │
-│   github.com/pedro3pv/SweetDesk-core        │
+│   github.com/Molasses-Co/SweetDesk-core        │
 │   - Classificação automática (anime/foto)   │
 │   - Upscaling (RealCUGAN / LSDIR)           │
 │   - Seam carving (aspect ratio)             │
@@ -195,7 +195,7 @@ SweetDesk/
 
 ### 1. Upscaling Inteligente
 
-O SweetDesk usa o [SweetDesk-core](https://github.com/pedro3pv/SweetDesk-core) que aplica automaticamente o modelo mais adequado:
+O SweetDesk usa o [SweetDesk-core](https://github.com/Molasses-Co/SweetDesk-core) que aplica automaticamente o modelo mais adequado:
 
 - **Fotos/Realismo**: LSDIR (Real-ESRGAN 4x)
 - **Anime/Ilustrações**: RealCUGAN-pro
@@ -300,11 +300,11 @@ go test -v ./internal/services -run TestCoreBridge
 
 ```bash
 # Atualizar para versão específica
-go get github.com/pedro3pv/SweetDesk-core@v0.0.5
+go get github.com/Molasses-Co/SweetDesk-core@v0.0.5
 
 # Ou usar versão local para desenvolvimento
 # Edite go.mod e descomente:
-# replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core
+# replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core
 
 go mod tidy
 ```
@@ -383,7 +383,7 @@ git push origin feature/minha-feature
 
 | Componente | Licença | Link |
 |-----------|---------|------|
-| SweetDesk-core | MIT | [GitHub](https://github.com/pedro3pv/SweetDesk-core) |
+| SweetDesk-core | MIT | [GitHub](https://github.com/Molasses-Co/SweetDesk-core) |
 | Wails | MIT | [wails.io](https://wails.io) |
 | Next.js | MIT | [nextjs.org](https://nextjs.org) |
 | ONNX Runtime | MIT | [onnxruntime.ai](https://onnxruntime.ai) |
@@ -393,7 +393,7 @@ git push origin feature/minha-feature
 
 ## 🔗 Links Relacionados
 
-- **[SweetDesk-core](https://github.com/pedro3pv/SweetDesk-core)** — Motor de processamento em Go
+- **[SweetDesk-core](https://github.com/Molasses-Co/SweetDesk-core)** — Motor de processamento em Go
 - **[Wails](https://wails.io)** — Framework para apps desktop com Go
 - **[Next.js](https://nextjs.org)** — Framework React
 - **[Pixabay API](https://pixabay.com/api/docs/)** — API de imagens grátis
@@ -457,4 +457,4 @@ Desenvolvido por **[@pedro3pv](https://github.com/pedro3pv)** para **[Molasses C
 **Versão**: 0.0.1  
 **Última atualização**: Fevereiro 2026  
 **Mantenedor**: [@pedro3pv](https://github.com/pedro3pv)  
-**Core Engine**: [SweetDesk-core v0.0.4](https://github.com/pedro3pv/SweetDesk-core)
+**Core Engine**: [SweetDesk-core v0.0.4](https://github.com/Molasses-Co/SweetDesk-core)

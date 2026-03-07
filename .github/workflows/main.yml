@@ -57,7 +57,7 @@ jobs:
         run: |
           cd ..
           # Usa PAT_TOKEN para clonar repositório privado
-          git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/pedro3pv/SweetDesk-core.git
+          git clone https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/Molasses-Co/SweetDesk-core.git
           ls -la
 
 
@@ -76,9 +76,9 @@ jobs:
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            sed -i 's|// replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core|replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core|g' go.mod
+            sed -i 's|// replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core|replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core|g' go.mod
           else
-            sed -i.bak 's|// replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core|replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core|g' go.mod
+            sed -i.bak 's|// replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core|replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core|g' go.mod
             rm -f go.mod.bak
           fi
           cat go.mod | grep "replace"

@@ -18,7 +18,7 @@ git clone https://github.com/Molasses-Co/SweetDesk.git
 cd SweetDesk
 
 # For local development: clone SweetDesk-core locally
-git clone https://github.com/pedro3pv/SweetDesk-core.git ../SweetDesk-core
+git clone https://github.com/Molasses-Co/SweetDesk-core.git ../SweetDesk-core
 ```
 
 ### Update Dependencies
@@ -40,14 +40,14 @@ go mod verify
 ### Option A: Using GitHub Dependency (Production)
 ```bash
 # Dependencies are automatically resolved from GitHub
-go get -u github.com/pedro3pv/SweetDesk-core@latest
+go get -u github.com/Molasses-Co/SweetDesk-core@latest
 ```
 
 ### Option B: Using Local Development Version
 
 1. Uncomment the replace directive in `go.mod`:
 ```go
-replace github.com/pedro3pv/SweetDesk-core => ../SweetDesk-core
+replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core
 ```
 
 2. Verify the path:
@@ -140,7 +140,7 @@ go build -v ./cmd/desktop
 go list -m all | grep -E "(SweetDesk-core|wails|onnx|gorgonia)"
 
 # Expected output:
-# github.com/pedro3pv/SweetDesk-core v0.1.0
+# github.com/Molasses-Co/SweetDesk-core v0.1.0
 # github.com/wailsapp/wails/v2 v2.11.0
 # github.com/owulveryck/onnx-go v0.4.0
 # gorgonia.org/tensor v0.9.24
@@ -173,7 +173,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"github.com/pedro3pv/SweetDesk-core/pkg/processor"
+	"github.com/Molasses-Co/SweetDesk-core/pkg/processor"
 )
 
 func main() {
@@ -213,7 +213,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"github.com/pedro3pv/SweetDesk-core/pkg/processor"
+	"github.com/Molasses-Co/SweetDesk-core/pkg/processor"
 )
 
 func main() {
@@ -253,7 +253,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"github.com/pedro3pv/SweetDesk-core/pkg/processor"
+	"github.com/Molasses-Co/SweetDesk-core/pkg/processor"
 )
 
 func main() {
@@ -295,9 +295,9 @@ export SWEETDESK_MODEL_DIR=/opt/models
 **Solution:** Verify go.mod dependency:
 ```bash
 grep "SweetDesk-core" go.mod
-# Should output: github.com/pedro3pv/SweetDesk-core v0.1.0
+# Should output: github.com/Molasses-Co/SweetDesk-core v0.1.0
 
-go get -u github.com/pedro3pv/SweetDesk-core@latest
+go get -u github.com/Molasses-Co/SweetDesk-core@latest
 go mod tidy
 ```
 
@@ -396,7 +396,7 @@ tar -czf sweetdesk-production.tar.gz distribution/
 
 ## 📚 Additional Resources
 
-- [SweetDesk-Core Documentation](https://github.com/pedro3pv/SweetDesk-core/wiki)
+- [SweetDesk-Core Documentation](https://github.com/Molasses-Co/SweetDesk-core/wiki)
 - [ONNX Runtime Setup](https://onnxruntime.ai/docs/install/)
 - [Wails Documentation](https://wails.io/docs/)
 - [Go Modules Guide](https://go.dev/blog/using-go-modules)

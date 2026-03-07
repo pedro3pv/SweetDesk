@@ -545,7 +545,7 @@ go list -u -m all
 go get -u github.com/package/name
 
 # Update SweetDesk-core
-go get -u github.com/pedro3pv/SweetDesk-core
+go get -u github.com/Molasses-Co/SweetDesk-core
 
 # Tidy up
 go mod tidy
@@ -687,7 +687,7 @@ func (a *App) ClassifyImageCached(hash string, data []byte) (string, error) {
 - [Wails Documentation](https://wails.io/docs/gettingstarted/firstproject)
 - [Go Documentation](https://golang.org/doc/)
 - [React Documentation](https://react.dev/)
-- [SweetDesk-Core Repository](https://github.com/pedro3pv/SweetDesk-core)
+- [SweetDesk-Core Repository](https://github.com/Molasses-Co/SweetDesk-core)
 
 ---
 

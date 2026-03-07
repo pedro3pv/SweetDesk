@@ -10,7 +10,7 @@ This document outlines all errors resolved and the integration with SweetDesk-co
 ### 1. **Dependency Management (`go.mod`)**
 **Issue:** Missing `SweetDesk-core` dependency and conflicting module references
 **Fix:** 
-- Added explicit dependency: `github.com/pedro3pv/SweetDesk-core v0.1.0`
+- Added explicit dependency: `github.com/Molasses-Co/SweetDesk-core v0.1.0`
 - Removed redundant/conflicting entries
 - Kept all Wails v2 and image processing dependencies
 - Added comment for local development override
@@ -282,7 +282,7 @@ if err != nil {
 
 ## 📝 References
 
-- [SweetDesk-Core Repository](https://github.com/pedro3pv/SweetDesk-core)
+- [SweetDesk-Core Repository](https://github.com/Molasses-Co/SweetDesk-core)
 - [Wails v2 Documentation](https://wails.io/docs/gettingstarted/installation)
 - [ONNX-Go Project](https://github.com/owulveryck/onnx-go)
 - [Gorgonia Project](https://gorgonia.org/)

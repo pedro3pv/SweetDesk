@@ -211,7 +211,7 @@ go doc github.com/Molasses-Co/SweetDesk/internal/services
 ## Support
 
 - GitHub Issues: [Molasses-Co/SweetDesk](https://github.com/Molasses-Co/SweetDesk/issues)
-- Core Repository: [pedro3pv/SweetDesk-core](https://github.com/pedro3pv/SweetDesk-core)
+- Core Repository: [pedro3pv/SweetDesk-core](https://github.com/Molasses-Co/SweetDesk-core)
 
 ---
 

@@ -9,7 +9,7 @@ This guide covers integrating SweetDesk-Core into your Wails application for adv
 ### 1. Installation
 
 ```bash
-go get -u github.com/pedro3pv/SweetDesk-core
+go get -u github.com/Molasses-Co/SweetDesk-core
 go mod tidy
 go generate ./...
 ```
@@ -21,7 +21,7 @@ package main
 
 import (
     "log"
-    "github.com/pedro3pv/SweetDesk-core/pkg/processor"
+    "github.com/Molasses-Co/SweetDesk-core/pkg/processor"
 )
 
 func main() {
@@ -412,7 +412,7 @@ func (a *App) UpscaleImage(imageData []byte, scale int) ([]byte, error) {
 ### Error Classification
 
 ```go
-import "github.com/pedro3pv/SweetDesk-core/pkg/errors"
+import "github.com/Molasses-Co/SweetDesk-core/pkg/errors"
 
 result, err := proc.Process(imageData, options)
 if err != nil {
@@ -588,9 +588,9 @@ Check documentation for stability status.
 
 ## Support
 
-- [GitHub Issues](https://github.com/pedro3pv/SweetDesk-core/issues)
-- [Documentation](https://github.com/pedro3pv/SweetDesk-core/wiki)
-- [Discussions](https://github.com/pedro3pv/SweetDesk-core/discussions)
+- [GitHub Issues](https://github.com/Molasses-Co/SweetDesk-core/issues)
+- [Documentation](https://github.com/Molasses-Co/SweetDesk-core/wiki)
+- [Discussions](https://github.com/Molasses-Co/SweetDesk-core/discussions)
 
 ---
 
