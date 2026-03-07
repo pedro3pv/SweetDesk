@@ -49,4 +49,4 @@ require (
 )
 
 // Uncomment to use local development version (CI will uncomment automatically)
-replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core
+// replace github.com/Molasses-Co/SweetDesk-core => ../SweetDesk-core

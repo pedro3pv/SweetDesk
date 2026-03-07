@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/pedro3pv/SweetDesk-core/pkg/processor"
-	"github.com/pedro3pv/SweetDesk-core/pkg/types"
+	"github.com/Molasses-Co/SweetDesk-core/pkg/processor"
+	"github.com/Molasses-Co/SweetDesk-core/pkg/types"
 )
 
 // CoreBridge wraps SweetDesk-core processor for Wails integration.

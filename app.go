@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pedro3pv/SweetDesk-core/pkg/types"
+	"github.com/Molasses-Co/SweetDesk-core/pkg/types"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
